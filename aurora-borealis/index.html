@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurora Borealis Simulator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    overflow: hidden;
+    background: #000;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #fff;
+    user-select: none;
+  }
+
+  canvas { display: block; }
+
+  #controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 24px;
+    width: 280px;
+    z-index: 10;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s;
+  }
+
+  #controls.hidden {
+    transform: translateX(320px);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #toggle-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 11;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s;
+  }
+
+  #toggle-btn:hover { transform: scale(1.1); }
+  #toggle-btn.panel-open { opacity: 0; pointer-events: none; }
+
+  h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 20px;
+    text-align: center;
+    background: linear-gradient(90deg, #00ff88, #00ccff, #aa44ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .control-group {
+    margin-bottom: 16px;
+  }
+
+  .control-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .control-group label span {
+    color: rgba(255, 255, 255, 0.4);
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  }
+
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .preset-btn {
+    flex: 1;
+    min-width: 70px;
+    padding: 8px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .preset-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .preset-btn.active {
+    border-color: rgba(100, 255, 180, 0.5);
+    background: rgba(100, 255, 180, 0.1);
+  }
+
+  .color-swatches {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: #fff; box-shadow: 0 0 12px rgba(255, 255, 255, 0.4); }
+
+  .close-panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+  }
+
+  .close-panel:hover { color: #fff; }
+
+  #info {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .separator {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 16px 0;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<button id="toggle-btn" title="Open controls">&#9881;</button>
+
+<div id="controls">
+  <button class="close-panel" id="close-panel">&times;</button>
+  <h1>AURORA BOREALIS</h1>
+
+  <div class="control-group">
+    <label>Intensity <span id="intensity-val">70%</span></label>
+    <input type="range" id="intensity" min="10" max="100" value="70">
+  </div>
+
+  <div class="control-group">
+    <label>Wave Speed <span id="speed-val">50%</span></label>
+    <input type="range" id="speed" min="5" max="100" value="50">
+  </div>
+
+  <div class="control-group">
+    <label>Curtain Width <span id="width-val">60%</span></label>
+    <input type="range" id="curtainWidth" min="10" max="100" value="60">
+  </div>
+
+  <div class="control-group">
+    <label>Vertical Drift <span id="drift-val">40%</span></label>
+    <input type="range" id="drift" min="0" max="100" value="40">
+  </div>
+
+  <div class="control-group">
+    <label>Star Density <span id="stars-val">60%</span></label>
+    <input type="range" id="starDensity" min="0" max="100" value="60">
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="control-group">
+    <label>Color Palette</label>
+    <div class="color-swatches" id="palettes"></div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="control-group">
+    <label>Presets</label>
+    <div class="preset-row">
+      <button class="preset-btn" data-preset="calm">Calm</button>
+      <button class="preset-btn" data-preset="storm">Storm</button>
+      <button class="preset-btn" data-preset="ethereal">Ethereal</button>
+      <button class="preset-btn" data-preset="fire">Fire</button>
+    </div>
+  </div>
+</div>
+
+<div id="info">Move mouse to influence the aurora &middot; Click anywhere for a burst</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  generateStars();
+}
+window.addEventListener('resize', resize);
+
+const palettes = [
+  { name: 'Classic',  colors: ['#00ff88', '#00ccaa', '#00aaff', '#4466ff'] },
+  { name: 'Violet',   colors: ['#aa44ff', '#cc66ff', '#8844dd', '#6622cc'] },
+  { name: 'Cyan',     colors: ['#00ffff', '#00ccdd', '#0099bb', '#00ffaa'] },
+  { name: 'Rose',     colors: ['#ff4488', '#ff66aa', '#cc3388', '#ff88cc'] },
+  { name: 'Solar',    colors: ['#ffaa00', '#ff6622', '#ffcc44', '#ff4400'] },
+  { name: 'Ice',      colors: ['#aaeeff', '#88ccff', '#66aadd', '#cceeff'] },
+];
+
+let activePalette = 0;
+let currentColors = [...palettes[0].colors];
+let targetColors = [...palettes[0].colors];
+
+const params = {
+  intensity: 0.7,
+  speed: 0.5,
+  curtainWidth: 0.6,
+  drift: 0.4,
+  starDensity: 0.6,
+};
+
+let mouse = { x: W / 2, y: H / 2, active: false };
+let bursts = [];
+let stars = [];
+let time = 0;
+
+function generateStars() {
+  const count = Math.floor(params.starDensity * 400);
+  stars = [];
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.7,
+      r: Math.random() * 1.5 + 0.3,
+      twinkleSpeed: Math.random() * 2 + 1,
+      twinkleOffset: Math.random() * Math.PI * 2,
+    });
+  }
+}
+
+const swatchContainer = document.getElementById('palettes');
+palettes.forEach((p, i) => {
+  const el = document.createElement('div');
+  el.className = 'swatch' + (i === 0 ? ' active' : '');
+  el.style.background = `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[2]})`;
+  el.title = p.name;
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    activePalette = i;
+    targetColors = [...palettes[i].colors];
+  });
+  swatchContainer.appendChild(el);
+});
+
+const presets = {
+  calm:     { intensity: 40, speed: 20, curtainWidth: 70, drift: 20, starDensity: 80 },
+  storm:    { intensity: 100, speed: 90, curtainWidth: 90, drift: 80, starDensity: 30 },
+  ethereal: { intensity: 55, speed: 30, curtainWidth: 50, drift: 50, starDensity: 70 },
+  fire:     { intensity: 85, speed: 70, curtainWidth: 60, drift: 60, starDensity: 20 },
+};
+
+const presetPalettes = { calm: 0, storm: 2, ethereal: 1, fire: 4 };
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const name = btn.dataset.preset;
+    const p = presets[name];
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    Object.entries(p).forEach(([key, val]) => {
+      const slider = document.getElementById(key);
+      slider.value = val;
+      slider.dispatchEvent(new Event('input'));
+    });
+
+    const palIdx = presetPalettes[name];
+    document.querySelectorAll('.swatch').forEach((s, i) => {
+      s.classList.toggle('active', i === palIdx);
+    });
+    activePalette = palIdx;
+    targetColors = [...palettes[palIdx].colors];
+  });
+});
+
+['intensity', 'speed', 'curtainWidth', 'drift', 'starDensity'].forEach(id => {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(id.replace(/([A-Z])/g, '-$1').toLowerCase().replace('curtain-width', 'width').replace('star-density', 'stars') + '-val');
+  el.addEventListener('input', () => {
+    const v = parseInt(el.value);
+    valEl.textContent = v + '%';
+    params[id] = v / 100;
+    if (id === 'starDensity') generateStars();
+  });
+});
+
+document.getElementById('close-panel').addEventListener('click', () => {
+  document.getElementById('controls').classList.add('hidden');
+  document.getElementById('toggle-btn').classList.remove('panel-open');
+});
+
+document.getElementById('toggle-btn').addEventListener('click', () => {
+  document.getElementById('controls').classList.remove('hidden');
+  document.getElementById('toggle-btn').classList.add('panel-open');
+});
+document.getElementById('toggle-btn').classList.add('panel-open');
+
+canvas.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.active = true;
+});
+
+canvas.addEventListener('mouseleave', () => { mouse.active = false; });
+
+canvas.addEventListener('click', e => {
+  bursts.push({ x: e.clientX, y: e.clientY, life: 1, startTime: time });
+});
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
+}
+
+function lerpColor(hex1, hex2, t) {
+  const [r1, g1, b1] = hexToRgb(hex1);
+  const [r2, g2, b2] = hexToRgb(hex2);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+}
+
+function lerpHex(hex1, hex2, t) {
+  const [r1, g1, b1] = hexToRgb(hex1);
+  const [r2, g2, b2] = hexToRgb(hex2);
+  return rgbToHex(
+    Math.round(r1 + (r2 - r1) * t),
+    Math.round(g1 + (g2 - g1) * t),
+    Math.round(b1 + (b2 - b1) * t)
+  );
+}
+
+const BANDS = 7;
+const SEGMENTS = 120;
+
+function drawAurora() {
+  for (let i = 0; i < 4; i++) {
+    currentColors[i] = lerpHex(currentColors[i], targetColors[i], 0.02);
+  }
+
+  const speedFactor = params.speed * 2;
+  const intensityFactor = params.intensity;
+  const widthFactor = params.curtainWidth;
+  const driftFactor = params.drift;
+
+  for (let band = 0; band < BANDS; band++) {
+    const bandRatio = band / BANDS;
+    const baseY = H * (0.15 + bandRatio * 0.35);
+    const alpha = intensityFactor * (0.12 + 0.08 * Math.sin(time * 0.3 + band)) * (1 - bandRatio * 0.4);
+
+    const colorIdx = (band / BANDS) * (currentColors.length - 1);
+    const ci = Math.floor(colorIdx);
+    const cf = colorIdx - ci;
+    const color = lerpColor(
+      currentColors[Math.min(ci, currentColors.length - 1)],
+      currentColors[Math.min(ci + 1, currentColors.length - 1)],
+      cf
+    );
+
+    ctx.beginPath();
+
+    const points = [];
+    for (let s = 0; s <= SEGMENTS; s++) {
+      const t = s / SEGMENTS;
+      const x = t * W;
+
+      let y = baseY;
+      y += Math.sin(t * 4 + time * speedFactor * 0.3 + band * 0.8) * 30 * widthFactor;
+      y += Math.sin(t * 7 - time * speedFactor * 0.2 + band * 1.2) * 15 * widthFactor;
+      y += Math.sin(t * 2.5 + time * speedFactor * 0.15) * 20 * driftFactor;
+
+      if (mouse.active) {
+        const dx = x - mouse.x;
+        const dy = baseY - mouse.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const influence = Math.max(0, 1 - dist / 300) * 40;
+        y -= influence * Math.sin(time * 2 + t * 3);
+      }
+
+      points.push({ x, y });
+    }
+
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++) {
+      const cpx = (points[i].x + points[i + 1].x) / 2;
+      const cpy = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, cpx, cpy);
+    }
+
+    const lastPt = points[points.length - 1];
+    ctx.lineTo(lastPt.x, lastPt.y);
+    ctx.lineTo(W, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+
+    const grad = ctx.createLinearGradient(0, baseY - 60, 0, baseY + H * 0.4);
+    grad.addColorStop(0, color.replace('rgb', 'rgba').replace(')', `,${alpha * 0.3})`));
+    grad.addColorStop(0.15, color.replace('rgb', 'rgba').replace(')', `,${alpha})`));
+    grad.addColorStop(0.5, color.replace('rgb', 'rgba').replace(')', `,${alpha * 0.4})`));
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  drawRays();
+}
+
+function drawRays() {
+  const rayCount = Math.floor(15 + params.intensity * 20);
+  const speedFactor = params.speed * 2;
+
+  for (let i = 0; i < rayCount; i++) {
+    const baseX = (i / rayCount) * W;
+    const wobble = Math.sin(time * speedFactor * 0.4 + i * 0.7) * 30 * params.curtainWidth;
+    const x = baseX + wobble;
+
+    const rayHeight = H * (0.15 + 0.35 * params.intensity * (0.5 + 0.5 * Math.sin(time * 0.5 + i * 1.3)));
+    const topY = H * 0.12 + Math.sin(time * speedFactor * 0.2 + i) * 20 * params.drift;
+
+    const colorIdx = ((x / W) * (currentColors.length - 1)) % currentColors.length;
+    const ci = Math.floor(colorIdx);
+    const cf = colorIdx - ci;
+    const color = lerpColor(
+      currentColors[Math.min(ci, currentColors.length - 1)],
+      currentColors[Math.min(ci + 1, currentColors.length - 1)],
+      cf
+    );
+
+    const alpha = params.intensity * 0.06 * (0.5 + 0.5 * Math.sin(time * 1.2 + i * 2.1));
+
+    const grad = ctx.createLinearGradient(x, topY, x, topY + rayHeight);
+    grad.addColorStop(0, color.replace('rgb', 'rgba').replace(')', `,${alpha * 0.2})`));
+    grad.addColorStop(0.3, color.replace('rgb', 'rgba').replace(')', `,${alpha})`));
+    grad.addColorStop(0.7, color.replace('rgb', 'rgba').replace(')', `,${alpha * 0.5})`));
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.beginPath();
+    ctx.moveTo(x - 2, topY);
+    ctx.lineTo(x + 2, topY);
+    ctx.lineTo(x + 1 + Math.sin(time + i) * 2, topY + rayHeight);
+    ctx.lineTo(x - 1 + Math.sin(time + i) * 2, topY + rayHeight);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+function drawBursts() {
+  bursts = bursts.filter(b => b.life > 0);
+  bursts.forEach(b => {
+    b.life -= 0.008;
+    const progress = 1 - b.life;
+    const radius = progress * 250;
+    const alpha = b.life * params.intensity * 0.5;
+
+    const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, radius);
+    const color = currentColors[Math.floor(Math.random() * currentColors.length)];
+    grad.addColorStop(0, color.replace('rgb', 'rgba').replace(')', `,${alpha})`).replace('#', ''));
+
+    const [r, g, bl] = hexToRgb(color);
+    grad.addColorStop(0, `rgba(${r},${g},${bl},${alpha})`);
+    grad.addColorStop(0.5, `rgba(${r},${g},${bl},${alpha * 0.3})`);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  });
+}
+
+function drawStars() {
+  stars.forEach(star => {
+    const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(time * star.twinkleSpeed + star.twinkleOffset));
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${twinkle * 0.8})`;
+    ctx.fill();
+  });
+}
+
+function drawGround() {
+  const grad = ctx.createLinearGradient(0, H * 0.85, 0, H);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(0.3, 'rgba(5,8,15,0.8)');
+  grad.addColorStop(1, 'rgb(8,12,20)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H * 0.85, W, H * 0.15);
+
+  ctx.beginPath();
+  ctx.moveTo(0, H * 0.88);
+  for (let x = 0; x <= W; x += 3) {
+    const y = H * 0.88 + Math.sin(x * 0.005) * 8 + Math.sin(x * 0.013) * 5 + Math.sin(x * 0.002) * 12;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgb(6,9,16)';
+  ctx.fill();
+
+  drawTrees();
+}
+
+function drawTrees() {
+  const treePositions = [0.05, 0.12, 0.18, 0.28, 0.35, 0.42, 0.55, 0.62, 0.7, 0.78, 0.85, 0.92, 0.97];
+
+  treePositions.forEach((pos, i) => {
+    const x = pos * W;
+    const baseY = H * 0.88 + Math.sin(x * 0.005) * 8 + Math.sin(x * 0.013) * 5;
+    const height = 30 + (i % 3) * 15 + Math.sin(i * 2.5) * 10;
+    const width = 8 + (i % 2) * 4;
+
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x - width, baseY);
+    ctx.lineTo(x, baseY - height);
+    ctx.lineTo(x + width, baseY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgb(4,6,12)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x, baseY - height * 0.3);
+    ctx.lineTo(x - width * 0.75, baseY - height * 0.3);
+    ctx.lineTo(x, baseY - height - 10);
+    ctx.lineTo(x + width * 0.75, baseY - height * 0.3);
+    ctx.closePath();
+    ctx.fill();
+  });
+}
+
+function drawSky() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#020408');
+  grad.addColorStop(0.5, '#050a14');
+  grad.addColorStop(1, '#0a0f1a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function animate() {
+  time += 0.008;
+
+  drawSky();
+  drawStars();
+  drawAurora();
+  drawBursts();
+  drawGround();
+
+  requestAnimationFrame(animate);
+}
+
+resize();
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generative Art Studio</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+  canvas {
+    flex: 1;
+    cursor: crosshair;
+  }
+  #controls {
+    width: 260px;
+    background: rgba(15, 15, 25, 0.95);
+    border-left: 1px solid rgba(255,255,255,0.08);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    z-index: 10;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 8px;
+  }
+  label {
+    font-size: 12px;
+    color: #aaa;
+    display: block;
+    margin-bottom: 4px;
+  }
+  select, input[type="range"] {
+    width: 100%;
+    background: #1a1a2e;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #e0e0e0;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: #1a1a2e;
+    padding: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #6c5ce7;
+    cursor: pointer;
+  }
+  .range-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .range-val {
+    font-size: 11px;
+    color: #6c5ce7;
+    min-width: 30px;
+    text-align: right;
+  }
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+  button {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  button:hover {
+    background: #6c5ce7;
+    border-color: #6c5ce7;
+    color: #fff;
+  }
+  button.primary {
+    background: #6c5ce7;
+    border-color: #6c5ce7;
+    color: #fff;
+  }
+  button.primary:hover {
+    background: #7d6ff0;
+  }
+  .palette-row {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .palette-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .palette-swatch.active {
+    border-color: #fff;
+  }
+  .divider {
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .stats {
+    font-size: 11px;
+    color: #555;
+    margin-top: auto;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="controls">
+  <div>
+    <h1>Generative Art Studio</h1>
+    <div class="subtitle">Click & drag to paint with particles</div>
+  </div>
+
+  <div>
+    <label>Mode</label>
+    <select id="mode">
+      <option value="flowfield">Flow Field</option>
+      <option value="spirograph">Spirograph</option>
+      <option value="constellation">Constellation</option>
+      <option value="aurora">Aurora Waves</option>
+      <option value="fireworks">Fireworks</option>
+    </select>
+  </div>
+
+  <div>
+    <label>Palette</label>
+    <div class="palette-row" id="palettes"></div>
+  </div>
+
+  <div>
+    <div class="range-row">
+      <label>Particle Count</label>
+      <span class="range-val" id="countVal">200</span>
+    </div>
+    <input type="range" id="count" min="50" max="1000" value="200" step="10">
+  </div>
+
+  <div>
+    <div class="range-row">
+      <label>Speed</label>
+      <span class="range-val" id="speedVal">3</span>
+    </div>
+    <input type="range" id="speed" min="0.5" max="10" value="3" step="0.5">
+  </div>
+
+  <div>
+    <div class="range-row">
+      <label>Trail Length</label>
+      <span class="range-val" id="trailVal">15</span>
+    </div>
+    <input type="range" id="trail" min="1" max="50" value="15">
+  </div>
+
+  <div>
+    <div class="range-row">
+      <label>Particle Size</label>
+      <span class="range-val" id="sizeVal">2</span>
+    </div>
+    <input type="range" id="size" min="1" max="8" value="2" step="0.5">
+  </div>
+
+  <div>
+    <div class="range-row">
+      <label>Turbulence</label>
+      <span class="range-val" id="turbVal">0.01</span>
+    </div>
+    <input type="range" id="turbulence" min="0.002" max="0.05" value="0.01" step="0.002">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="btn-row">
+    <button class="primary" id="generate">Generate</button>
+    <button id="clear">Clear</button>
+  </div>
+  <div class="btn-row">
+    <button id="pause">Pause</button>
+    <button id="save">Save PNG</button>
+  </div>
+
+  <div class="stats" id="stats">Particles: 0 | FPS: 0</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const palettes = [
+  { name: 'Neon', colors: ['#ff006e','#fb5607','#ffbe0b','#8338ec','#3a86ff'] },
+  { name: 'Ocean', colors: ['#03045e','#0077b6','#00b4d8','#90e0ef','#caf0f8'] },
+  { name: 'Sunset', colors: ['#ff595e','#ff924c','#ffca3a','#c5ca30','#8ac926'] },
+  { name: 'Mono', colors: ['#ffffff','#c0c0c0','#808080','#404040','#1a1a1a'] },
+  { name: 'Forest', colors: ['#2d6a4f','#40916c','#52b788','#74c69d','#b7e4c7'] },
+  { name: 'Candy', colors: ['#f72585','#b5179e','#7209b7','#560bad','#480ca8'] },
+];
+
+let currentPalette = 0;
+let particles = [];
+let paused = false;
+let mouse = { x: -1000, y: -1000, down: false };
+let frameCount = 0;
+let lastFpsTime = performance.now();
+let fps = 0;
+let noiseZ = 0;
+
+function resize() {
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Simplex-like noise using sin combinations
+function noise(x, y, z) {
+  return (
+    Math.sin(x * 1.2 + z * 0.3) * Math.cos(y * 0.9 + z * 0.5) +
+    Math.sin(x * 0.7 + y * 1.1 + z * 0.2) * 0.5 +
+    Math.cos(x * 2.1 - y * 0.4 + z * 0.7) * 0.3
+  ) / 1.8;
+}
+
+const palRow = document.getElementById('palettes');
+palettes.forEach((p, i) => {
+  const sw = document.createElement('div');
+  sw.className = 'palette-swatch' + (i === 0 ? ' active' : '');
+  sw.style.background = `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[2]}, ${p.colors[4]})`;
+  sw.title = p.name;
+  sw.onclick = () => {
+    currentPalette = i;
+    document.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+  };
+  palRow.appendChild(sw);
+});
+
+function getVal(id) { return parseFloat(document.getElementById(id).value); }
+
+['count','speed','trail','size','turbulence'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    document.getElementById(id + 'Val').textContent = e.target.value;
+  });
+});
+
+class Particle {
+  constructor(x, y) {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    this.x = x ?? Math.random() * w;
+    this.y = y ?? Math.random() * h;
+    this.vx = 0;
+    this.vy = 0;
+    this.color = palettes[currentPalette].colors[Math.floor(Math.random() * 5)];
+    this.life = 1;
+    this.maxLife = 200 + Math.random() * 300;
+    this.age = 0;
+    this.history = [];
+    this.angle = Math.random() * Math.PI * 2;
+    this.radius = 20 + Math.random() * 100;
+    this.angularSpeed = (0.01 + Math.random() * 0.03) * (Math.random() > 0.5 ? 1 : -1);
+    this.centerX = this.x;
+    this.centerY = this.y;
+    this.phase = Math.random() * Math.PI * 2;
+  }
+
+  update(mode, speed, turbulence, trailLen) {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    this.age++;
+    this.life = Math.max(0, 1 - this.age / this.maxLife);
+
+    if (mode === 'flowfield') {
+      const angle = noise(this.x * turbulence, this.y * turbulence, noiseZ) * Math.PI * 4;
+      this.vx += Math.cos(angle) * 0.3;
+      this.vy += Math.sin(angle) * 0.3;
+      this.vx *= 0.95;
+      this.vy *= 0.95;
+      this.x += this.vx * speed * 0.5;
+      this.y += this.vy * speed * 0.5;
+    } else if (mode === 'spirograph') {
+      this.angle += this.angularSpeed * speed * 0.3;
+      const r = this.radius + Math.sin(this.angle * 3 + this.phase) * 30;
+      this.x = this.centerX + Math.cos(this.angle) * r;
+      this.y = this.centerY + Math.sin(this.angle) * r;
+      this.centerX += Math.sin(noiseZ + this.phase) * 0.3;
+      this.centerY += Math.cos(noiseZ + this.phase * 1.3) * 0.3;
+    } else if (mode === 'constellation') {
+      const angle = noise(this.x * turbulence * 0.5, this.y * turbulence * 0.5, noiseZ) * Math.PI * 2;
+      this.vx += Math.cos(angle) * 0.1;
+      this.vy += Math.sin(angle) * 0.1;
+      this.vx *= 0.98;
+      this.vy *= 0.98;
+      this.x += this.vx * speed * 0.3;
+      this.y += this.vy * speed * 0.3;
+    } else if (mode === 'aurora') {
+      this.x += speed * 0.5;
+      this.y += Math.sin(this.x * turbulence * 2 + this.phase + noiseZ) * speed * 0.8;
+      this.y += noise(this.x * turbulence, this.y * turbulence, noiseZ) * 2;
+    } else if (mode === 'fireworks') {
+      this.vy += 0.05;
+      this.vx *= 0.99;
+      this.vy *= 0.99;
+      this.x += this.vx * speed * 0.4;
+      this.y += this.vy * speed * 0.4;
+    }
+
+    if (mouse.down) {
+      const dx = mouse.x - this.x;
+      const dy = mouse.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 200) {
+        const force = (200 - dist) / 200 * 0.5;
+        this.vx += (dx / dist) * force;
+        this.vy += (dy / dist) * force;
+      }
+    }
+
+    this.history.push({ x: this.x, y: this.y });
+    if (this.history.length > trailLen) this.history.shift();
+
+    if (this.x < -50) this.x = w + 50;
+    if (this.x > w + 50) this.x = -50;
+    if (this.y < -50) this.y = h + 50;
+    if (this.y > h + 50) this.y = -50;
+
+    return this.life > 0;
+  }
+
+  draw(ctx, size, mode) {
+    if (this.history.length < 2) return;
+
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = size * this.life;
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = this.life * 0.7;
+
+    ctx.beginPath();
+    ctx.moveTo(this.history[0].x, this.history[0].y);
+    for (let i = 1; i < this.history.length; i++) {
+      const p = this.history[i];
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, size * this.life * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawConstellationLines(ctx) {
+  const maxDist = 80;
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < maxDist) {
+        ctx.strokeStyle = particles[i].color;
+        ctx.globalAlpha = (1 - dist / maxDist) * 0.15 * particles[i].life * particles[j].life;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function generate() {
+  const count = getVal('count');
+  const mode = document.getElementById('mode').value;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+
+  for (let i = 0; i < count; i++) {
+    let p;
+    if (mode === 'fireworks') {
+      const cx = Math.random() * w;
+      const cy = Math.random() * h * 0.6;
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 1 + Math.random() * 4;
+      p = new Particle(cx, cy);
+      p.vx = Math.cos(angle) * spd;
+      p.vy = Math.sin(angle) * spd - 2;
+    } else {
+      p = new Particle();
+    }
+    particles.push(p);
+  }
+}
+
+function clearCanvas() {
+  particles = [];
+  ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+}
+
+function animate() {
+  if (!paused) {
+    const mode = document.getElementById('mode').value;
+    const speed = getVal('speed');
+    const trail = getVal('trail');
+    const size = getVal('size');
+    const turbulence = getVal('turbulence');
+
+    ctx.fillStyle = 'rgba(10, 10, 15, 0.05)';
+    ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+    particles = particles.filter(p => p.update(mode, speed, turbulence, trail));
+
+    if (mode === 'constellation') drawConstellationLines(ctx);
+
+    particles.forEach(p => p.draw(ctx, size, mode));
+
+    noiseZ += 0.003;
+    frameCount++;
+
+    const now = performance.now();
+    if (now - lastFpsTime > 500) {
+      fps = Math.round(frameCount / ((now - lastFpsTime) / 1000));
+      frameCount = 0;
+      lastFpsTime = now;
+    }
+
+    document.getElementById('stats').textContent = `Particles: ${particles.length} | FPS: ${fps}`;
+  }
+  requestAnimationFrame(animate);
+}
+
+canvas.addEventListener('mousedown', e => {
+  mouse.down = true;
+  mouse.x = e.offsetX;
+  mouse.y = e.offsetY;
+  const mode = document.getElementById('mode').value;
+  for (let i = 0; i < 20; i++) {
+    const p = new Particle(mouse.x + (Math.random() - 0.5) * 40, mouse.y + (Math.random() - 0.5) * 40);
+    if (mode === 'fireworks') {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 1 + Math.random() * 4;
+      p.vx = Math.cos(angle) * spd;
+      p.vy = Math.sin(angle) * spd - 2;
+    }
+    particles.push(p);
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  mouse.x = e.offsetX;
+  mouse.y = e.offsetY;
+  if (mouse.down) {
+    for (let i = 0; i < 5; i++) {
+      const p = new Particle(mouse.x + (Math.random() - 0.5) * 20, mouse.y + (Math.random() - 0.5) * 20);
+      particles.push(p);
+    }
+  }
+});
+
+canvas.addEventListener('mouseup', () => { mouse.down = false; });
+canvas.addEventListener('mouseleave', () => { mouse.down = false; });
+
+document.getElementById('generate').onclick = generate;
+document.getElementById('clear').onclick = clearCanvas;
+document.getElementById('pause').onclick = () => {
+  paused = !paused;
+  document.getElementById('pause').textContent = paused ? 'Resume' : 'Pause';
+};
+document.getElementById('save').onclick = () => {
+  const link = document.createElement('a');
+  link.download = 'generative-art.png';
+  link.href = canvas.toDataURL();
+  link.click();
+};
+
+generate();
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Web Apps</title>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --accent: #7c6ff7;
+    --accent2: #5ee7b7;
+    --text: #e8e8f0;
+    --muted: #7a7a8c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 60px 40px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+
+  .count-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .count-badge span {
+    color: var(--accent2);
+    font-weight: 600;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 40px 80px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 12px 40px rgba(124, 111, 247, 0.15);
+  }
+
+  .card-preview {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-preview::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.12;
+  }
+
+  .card-preview .emoji {
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+    animation: float 4s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .card-body {
+    padding: 20px 22px 22px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+  }
+
+  .card-desc {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+  }
+
+  .card-date {
+    font-size: 0.75rem;
+    color: var(--muted);
+    opacity: 0.7;
+  }
+
+  .card-arrow {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--accent);
+    transition: background 0.2s;
+  }
+
+  .card:hover .card-arrow {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .new-badge {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 600px) {
+    header { padding: 40px 20px 30px; }
+    main { padding: 30px 20px 60px; }
+    .grid { grid-template-columns: 1fr; }
+    h1 { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <h1>Daily Web Apps</h1>
+        <div class="tagline">A new interactive app, every single day</div>
+      </div>
+    </div>
+    <div class="count-badge"><span id="app-count">10</span> apps and counting</div>
+  </div>
+</header>
+<div class="divider"></div>
+
+<main>
+  <div class="grid" id="app-grid">
+
+    <a class="card" href="earth-day-forest/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#1a3a12,#2d5a1e)">
+        <div class="emoji" style="animation-delay:0s">🌳</div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="card-title">Earth Day Virtual Forest</div>
+          <span class="new-badge">New</span>
+        </div>
+        <div class="card-desc">Plant and grow animated trees — oak, pine, cherry blossom, palm, and flowers. Toggle day/night for fireflies. Watch your forest expand in real time.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 24, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="particle-life/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#0a0a1a,#1a0a2e)">
+        <div class="emoji" style="animation-delay:0.3s">🔬</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Particle Life</div>
+        <div class="card-desc">Emergent behavior simulation — particles with attraction and repulsion rules self-organize into complex living structures.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 23, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="kaleidoscope-painter/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#1a0a2e,#2e0a1a)">
+        <div class="emoji" style="animation-delay:0.6s">🔮</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Kaleidoscope Painter</div>
+        <div class="card-desc">Draw with symmetry — every stroke is mirrored into mesmerizing kaleidoscopic patterns in real time.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 22, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="aurora-borealis/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#001a10,#002a20)">
+        <div class="emoji" style="animation-delay:0.9s">🌌</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Aurora Borealis Simulator</div>
+        <div class="card-desc">A mesmerizing real-time aurora simulation with flowing curtains of light dancing across a starry night sky.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 21, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="synth-pad/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#0a001a,#1a0030)">
+        <div class="emoji" style="animation-delay:1.2s">🎹</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Synth Pad</div>
+        <div class="card-desc">A browser-based synthesizer pad. Play notes, switch waveforms, and add effects directly in your browser with Web Audio API.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 20, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="generative-art-studio/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#1a0000,#2e1a00)">
+        <div class="emoji" style="animation-delay:1.5s">🎨</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Generative Art Studio</div>
+        <div class="card-desc">Create infinite algorithmic artwork with tweakable parameters — flow fields, noise patterns, and procedural color palettes.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 19, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="pixel-art-studio/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#001a2e,#002e1a)">
+        <div class="emoji" style="animation-delay:1.8s">🖼️</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Pixel Art Studio</div>
+        <div class="card-desc">A fully-featured pixel art editor with color palettes, drawing tools, fill bucket, and canvas export.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 18, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="retro-arcade/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#1a1a00,#2e2200)">
+        <div class="emoji" style="animation-delay:2.1s">🕹️</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Retro Arcade</div>
+        <div class="card-desc">Classic arcade-style mini games built with vanilla JS and canvas. No frameworks, pure retro fun.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 17, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="gravity-ball-pit/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#001a2e,#00102e)">
+        <div class="emoji" style="animation-delay:2.4s">⚽</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Gravity Ball Pit</div>
+        <div class="card-desc">Drop hundreds of physics-simulated balls into a pit. Adjust gravity, elasticity, and spawn rate in real time.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 16, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+    <a class="card" href="gravity-sandbox/index.html">
+      <div class="card-preview" style="background: linear-gradient(135deg,#000a1a,#0a001a)">
+        <div class="emoji" style="animation-delay:2.7s">🪐</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Gravity Sandbox</div>
+        <div class="card-desc">N-body gravitational simulation — place planets, stars, and black holes and watch orbital mechanics unfold.</div>
+        <div class="card-footer">
+          <span class="card-date">Apr 15, 2026</span>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+    </a>
+
+  </div>
+</main>
+
+<footer>
+  Built daily with Claude · <a href="https://github.com" style="color:var(--accent);text-decoration:none">View on GitHub</a>
+</footer>
+
+</body>
+</html>

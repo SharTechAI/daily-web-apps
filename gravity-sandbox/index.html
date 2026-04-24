@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gravity Sandbox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #c8d0e0;
+    user-select: none;
+  }
+  canvas {
+    display: block;
+    cursor: crosshair;
+  }
+  #ui {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+  }
+  .panel {
+    background: rgba(15, 15, 35, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(100, 120, 200, 0.2);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #8899dd;
+    margin-bottom: 4px;
+  }
+  .hint {
+    font-size: 12px;
+    color: #667;
+    line-height: 1.5;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  button {
+    background: rgba(60, 70, 120, 0.4);
+    border: 1px solid rgba(100, 120, 200, 0.3);
+    color: #aab;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button:hover {
+    background: rgba(80, 90, 160, 0.5);
+    color: #dde;
+  }
+  button.active {
+    background: rgba(100, 120, 220, 0.5);
+    border-color: rgba(120, 140, 240, 0.6);
+    color: #fff;
+  }
+  .stat {
+    font-size: 12px;
+    color: #556;
+  }
+  label {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #889;
+  }
+  input[type="range"] {
+    width: 100px;
+    accent-color: #6677cc;
+  }
+  #trail-toggle {
+    accent-color: #6677cc;
+    width: 14px;
+    height: 14px;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="panel">
+    <h1>Gravity Sandbox</h1>
+    <p class="hint">
+      Click to place a body. Drag to set velocity.<br>
+      Scroll to change mass. Right-click to delete nearest.
+    </p>
+  </div>
+  <div class="panel controls">
+    <button id="btn-pause">Pause</button>
+    <button id="btn-clear">Clear</button>
+    <button id="btn-preset1">Solar System</button>
+    <button id="btn-preset2">Binary Stars</button>
+    <button id="btn-preset3">Galaxy</button>
+  </div>
+  <div class="panel">
+    <label>
+      <input type="checkbox" id="trail-toggle" checked>
+      Show trails
+    </label>
+    <label style="margin-top:6px">
+      Gravity: <input type="range" id="gravity-slider" min="0.1" max="5" step="0.1" value="1">
+      <span id="gravity-val">1.0</span>
+    </label>
+    <label style="margin-top:4px">
+      Time: <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1">
+      <span id="speed-val">1.0</span>
+    </label>
+    <div class="stat" id="body-count" style="margin-top:8px">Bodies: 0</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const G_BASE = 800;
+let gravityMul = 1;
+let speedMul = 1;
+let paused = false;
+let showTrails = true;
+let placingMass = 20;
+
+const bodies = [];
+const TRAIL_LEN = 120;
+
+class Body {
+  constructor(x, y, vx, vy, mass, color) {
+    this.x = x; this.y = y;
+    this.vx = vx; this.vy = vy;
+    this.mass = mass;
+    this.radius = Math.max(2, Math.pow(mass, 0.4) * 1.5);
+    this.color = color || randColor();
+    this.trail = [];
+    this.alive = true;
+  }
+}
+
+function randColor() {
+  const hue = Math.random() * 360;
+  const sat = 50 + Math.random() * 40;
+  const lit = 55 + Math.random() * 25;
+  return `hsl(${hue}, ${sat}%, ${lit}%)`;
+}
+
+function starColor(temp) {
+  // temp 0..1 maps from red to blue-white
+  const hue = 30 + temp * 190;
+  const sat = 60 + temp * 30;
+  const lit = 60 + temp * 20;
+  return `hsl(${hue}, ${sat}%, ${lit}%)`;
+}
+
+// Physics
+function simulate(dt) {
+  const G = G_BASE * gravityMul;
+  const n = bodies.length;
+
+  // compute forces
+  for (let i = 0; i < n; i++) {
+    if (!bodies[i].alive) continue;
+    for (let j = i + 1; j < n; j++) {
+      if (!bodies[j].alive) continue;
+      const a = bodies[i], b = bodies[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const distSq = dx * dx + dy * dy;
+      const dist = Math.sqrt(distSq);
+
+      // collision
+      if (dist < a.radius + b.radius) {
+        // merge into larger body
+        const totalMass = a.mass + b.mass;
+        const bigger = a.mass >= b.mass ? a : b;
+        const smaller = a.mass >= b.mass ? b : a;
+        bigger.vx = (a.vx * a.mass + b.vx * b.mass) / totalMass;
+        bigger.vy = (a.vy * a.mass + b.vy * b.mass) / totalMass;
+        bigger.x = (a.x * a.mass + b.x * b.mass) / totalMass;
+        bigger.y = (a.y * a.mass + b.y * b.mass) / totalMass;
+        bigger.mass = totalMass;
+        bigger.radius = Math.max(2, Math.pow(totalMass, 0.4) * 1.5);
+        smaller.alive = false;
+        continue;
+      }
+
+      const softening = 5;
+      const force = G * a.mass * b.mass / (distSq + softening * softening);
+      const fx = force * dx / dist;
+      const fy = force * dy / dist;
+
+      a.vx += fx / a.mass * dt;
+      a.vy += fy / a.mass * dt;
+      b.vx -= fx / b.mass * dt;
+      b.vy -= fy / b.mass * dt;
+    }
+  }
+
+  // update positions & trails
+  for (let i = n - 1; i >= 0; i--) {
+    const b = bodies[i];
+    if (!b.alive) { bodies.splice(i, 1); continue; }
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.trail.push({ x: b.x, y: b.y });
+    if (b.trail.length > TRAIL_LEN) b.trail.shift();
+  }
+}
+
+// Rendering
+function draw() {
+  ctx.fillStyle = 'rgba(10, 10, 26, 0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  // trails
+  if (showTrails) {
+    for (const b of bodies) {
+      if (b.trail.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(b.trail[0].x, b.trail[0].y);
+      for (let i = 1; i < b.trail.length; i++) {
+        ctx.lineTo(b.trail[i].x, b.trail[i].y);
+      }
+      ctx.strokeStyle = b.color;
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = Math.max(1, b.radius * 0.4);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // bodies
+  for (const b of bodies) {
+    // glow
+    const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.radius * 4);
+    grad.addColorStop(0, b.color);
+    grad.addColorStop(0.3, b.color.replace(')', ', 0.3)').replace('hsl', 'hsla'));
+    grad.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius * 4, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // core
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+    ctx.fillStyle = b.color;
+    ctx.fill();
+  }
+
+  // drag preview
+  if (dragging) {
+    ctx.beginPath();
+    ctx.moveTo(dragStart.x, dragStart.y);
+    ctx.lineTo(dragEnd.x, dragEnd.y);
+    ctx.strokeStyle = 'rgba(150,160,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // preview body
+    const r = Math.max(2, Math.pow(placingMass, 0.4) * 1.5);
+    ctx.beginPath();
+    ctx.arc(dragStart.x, dragStart.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(150,160,255,0.6)';
+    ctx.fill();
+
+    // arrow
+    const dx = dragEnd.x - dragStart.x;
+    const dy = dragEnd.y - dragStart.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len > 10) {
+      const angle = Math.atan2(dy, dx);
+      ctx.beginPath();
+      ctx.moveTo(dragEnd.x, dragEnd.y);
+      ctx.lineTo(dragEnd.x - 10*Math.cos(angle-0.4), dragEnd.y - 10*Math.sin(angle-0.4));
+      ctx.moveTo(dragEnd.x, dragEnd.y);
+      ctx.lineTo(dragEnd.x - 10*Math.cos(angle+0.4), dragEnd.y - 10*Math.sin(angle+0.4));
+      ctx.stroke();
+    }
+  }
+}
+
+// Input
+let dragging = false;
+let dragStart = { x: 0, y: 0 };
+let dragEnd = { x: 0, y: 0 };
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 2) {
+    // right click - delete nearest
+    e.preventDefault();
+    let minDist = Infinity, minIdx = -1;
+    for (let i = 0; i < bodies.length; i++) {
+      const dx = bodies[i].x - e.clientX;
+      const dy = bodies[i].y - e.clientY;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    }
+    if (minIdx >= 0 && minDist < 50) bodies.splice(minIdx, 1);
+    return;
+  }
+  dragging = true;
+  dragStart = { x: e.clientX, y: e.clientY };
+  dragEnd = { ...dragStart };
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) dragEnd = { x: e.clientX, y: e.clientY };
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!dragging) return;
+  dragging = false;
+  const dx = dragStart.x - dragEnd.x;
+  const dy = dragStart.y - dragEnd.y;
+  const vx = dx * 0.5;
+  const vy = dy * 0.5;
+  bodies.push(new Body(dragStart.x, dragStart.y, vx, vy, placingMass));
+  updateCount();
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  placingMass = Math.max(1, Math.min(500, placingMass * (e.deltaY > 0 ? 0.85 : 1.18)));
+}, { passive: false });
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// UI
+const btnPause = document.getElementById('btn-pause');
+const btnClear = document.getElementById('btn-clear');
+const trailToggle = document.getElementById('trail-toggle');
+const gravSlider = document.getElementById('gravity-slider');
+const gravVal = document.getElementById('gravity-val');
+const speedSlider = document.getElementById('speed-slider');
+const speedVal = document.getElementById('speed-val');
+const bodyCount = document.getElementById('body-count');
+
+btnPause.addEventListener('click', () => {
+  paused = !paused;
+  btnPause.textContent = paused ? 'Play' : 'Pause';
+  btnPause.classList.toggle('active', paused);
+});
+
+btnClear.addEventListener('click', () => {
+  bodies.length = 0;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  updateCount();
+});
+
+trailToggle.addEventListener('change', () => {
+  showTrails = trailToggle.checked;
+  if (!showTrails) {
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, W, H);
+  }
+});
+
+gravSlider.addEventListener('input', () => {
+  gravityMul = parseFloat(gravSlider.value);
+  gravVal.textContent = gravityMul.toFixed(1);
+});
+
+speedSlider.addEventListener('input', () => {
+  speedMul = parseFloat(speedSlider.value);
+  speedVal.textContent = speedMul.toFixed(1);
+});
+
+function updateCount() {
+  bodyCount.textContent = `Bodies: ${bodies.length}`;
+}
+
+// Presets
+document.getElementById('btn-preset1').addEventListener('click', () => {
+  bodies.length = 0;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  const cx = W/2, cy = H/2;
+  bodies.push(new Body(cx, cy, 0, 0, 300, '#ffdd44')); // sun
+  const planets = [
+    { dist: 80, mass: 3, color: '#aab' },
+    { dist: 130, mass: 8, color: '#dd8844' },
+    { dist: 190, mass: 12, color: '#4488dd' },
+    { dist: 260, mass: 6, color: '#cc4433' },
+    { dist: 350, mass: 50, color: '#ddaa66' },
+  ];
+  for (const p of planets) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.sqrt(G_BASE * 300 / p.dist) * 0.9;
+    bodies.push(new Body(
+      cx + Math.cos(angle) * p.dist,
+      cy + Math.sin(angle) * p.dist,
+      -Math.sin(angle) * speed,
+      Math.cos(angle) * speed,
+      p.mass, p.color
+    ));
+  }
+  updateCount();
+});
+
+document.getElementById('btn-preset2').addEventListener('click', () => {
+  bodies.length = 0;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  const cx = W/2, cy = H/2;
+  const sep = 80;
+  const orbSpeed = Math.sqrt(G_BASE * 150 / (sep * 2)) * 0.7;
+  bodies.push(new Body(cx - sep, cy, 0, -orbSpeed, 150, '#6699ff'));
+  bodies.push(new Body(cx + sep, cy, 0, orbSpeed, 150, '#ff6644'));
+  // add some orbiting particles
+  for (let i = 0; i < 20; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 200 + Math.random() * 200;
+    const speed = Math.sqrt(G_BASE * 300 / dist) * (0.7 + Math.random() * 0.3);
+    bodies.push(new Body(
+      cx + Math.cos(angle) * dist,
+      cy + Math.sin(angle) * dist,
+      -Math.sin(angle) * speed,
+      Math.cos(angle) * speed,
+      1 + Math.random() * 3
+    ));
+  }
+  updateCount();
+});
+
+document.getElementById('btn-preset3').addEventListener('click', () => {
+  bodies.length = 0;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  const cx = W/2, cy = H/2;
+  bodies.push(new Body(cx, cy, 0, 0, 400, '#ffeecc')); // core
+  for (let i = 0; i < 80; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 60 + Math.random() * 350;
+    const speed = Math.sqrt(G_BASE * 400 / dist) * (0.8 + Math.random() * 0.2);
+    // add some spiral offset
+    const spiralAngle = angle + dist * 0.005;
+    bodies.push(new Body(
+      cx + Math.cos(spiralAngle) * dist,
+      cy + Math.sin(spiralAngle) * dist,
+      -Math.sin(spiralAngle) * speed,
+      Math.cos(spiralAngle) * speed,
+      0.5 + Math.random() * 2,
+      starColor(Math.random())
+    ));
+  }
+  updateCount();
+});
+
+// Main loop
+let lastTime = 0;
+function loop(time) {
+  const rawDt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+  const dt = paused ? 0 : rawDt * speedMul;
+
+  if (dt > 0) {
+    // substep for stability
+    const steps = 4;
+    const subDt = dt / steps;
+    for (let s = 0; s < steps; s++) simulate(subDt);
+    updateCount();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(t => { lastTime = t; loop(t); });
+</script>
+</body>
+</html>

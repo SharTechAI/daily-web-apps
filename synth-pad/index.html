@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synth Pad</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d0d1a;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #ccc;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 20px; color: #fff; letter-spacing: 2px; font-weight: 300; }
+
+  .controls {
+    display: flex; gap: 16px; align-items: center;
+  }
+  .control-group { display: flex; align-items: center; gap: 6px; }
+  .control-group label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+
+  select, input[type=range] { cursor: pointer; }
+  select {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #aaa; padding: 4px 8px; border-radius: 6px; font-size: 12px;
+  }
+  input[type=range] {
+    -webkit-appearance: none; width: 80px; height: 3px;
+    background: rgba(255,255,255,0.12); border-radius: 2px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    background: #7b68ee; border-radius: 50%;
+  }
+
+  #pad-area {
+    flex: 1; position: relative; cursor: crosshair;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(123,104,238,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 40%, rgba(238,130,104,0.04) 0%, transparent 60%);
+  }
+
+  #pad-canvas { width: 100%; height: 100%; display: block; }
+
+  .axis-label {
+    position: absolute; font-size: 10px; color: #444;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .axis-x { bottom: 8px; left: 50%; transform: translateX(-50%); }
+  .axis-y { top: 50%; left: 8px; transform: translateY(-50%) rotate(-90deg); }
+
+  #info {
+    position: absolute; bottom: 12px; right: 16px;
+    font-size: 11px; color: #555;
+  }
+
+  #visualizer {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; opacity: 0.5;
+  }
+
+  .touch-point {
+    position: absolute; width: 24px; height: 24px;
+    border: 2px solid rgba(123,104,238,0.6);
+    border-radius: 50%; transform: translate(-50%, -50%);
+    pointer-events: none; transition: opacity 0.3s;
+  }
+  .touch-point::after {
+    content: ''; position: absolute; inset: -8px;
+    border: 1px solid rgba(123,104,238,0.15);
+    border-radius: 50%;
+  }
+
+  /* Keys at bottom */
+  #keyboard {
+    height: 60px; flex-shrink: 0;
+    display: flex; border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .key {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #555; cursor: pointer;
+    border-right: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .key:hover { background: rgba(123,104,238,0.08); }
+  .key.active { background: rgba(123,104,238,0.2); color: #7b68ee; }
+  .key.black {
+    background: rgba(0,0,0,0.3);
+  }
+  .key.black.active { background: rgba(123,104,238,0.25); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SYNTH PAD</h1>
+  <div class="controls">
+    <div class="control-group">
+      <label>Wave</label>
+      <select id="waveform">
+        <option value="sine">Sine</option>
+        <option value="triangle">Triangle</option>
+        <option value="sawtooth">Sawtooth</option>
+        <option value="square">Square</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>Scale</label>
+      <select id="scale">
+        <option value="pentatonic">Pentatonic</option>
+        <option value="major">Major</option>
+        <option value="minor">Minor</option>
+        <option value="chromatic">Chromatic</option>
+        <option value="blues">Blues</option>
+        <option value="dorian">Dorian</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>Reverb</label>
+      <input type="range" id="reverb" min="0" max="1" step="0.05" value="0.4">
+    </div>
+    <div class="control-group">
+      <label>Delay</label>
+      <input type="range" id="delay" min="0" max="0.8" step="0.05" value="0.3">
+    </div>
+    <div class="control-group">
+      <label>Attack</label>
+      <input type="range" id="attack" min="0.01" max="1" step="0.01" value="0.05">
+    </div>
+    <div class="control-group">
+      <label>Release</label>
+      <input type="range" id="release" min="0.05" max="2" step="0.05" value="0.5">
+    </div>
+  </div>
+</header>
+
+<div id="pad-area">
+  <canvas id="pad-canvas"></canvas>
+  <canvas id="visualizer"></canvas>
+  <div class="axis-label axis-x">Pitch &rarr;</div>
+  <div class="axis-label axis-y">Filter &rarr;</div>
+  <div id="info">Click or drag to play &middot; X = pitch &middot; Y = filter</div>
+</div>
+
+<div id="keyboard"></div>
+
+<script>
+// Audio context setup
+let audioCtx = null;
+let masterGain, reverbNode, delayNode, delayFeedback, analyser;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.3;
+
+  // Reverb (convolver with generated impulse)
+  reverbNode = audioCtx.createConvolver();
+  const impulseLen = audioCtx.sampleRate * 2;
+  const impulse = audioCtx.createBuffer(2, impulseLen, audioCtx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < impulseLen; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / impulseLen, 2.5);
+    }
+  }
+  reverbNode.buffer = impulse;
+
+  // Delay
+  delayNode = audioCtx.createDelay(1);
+  delayNode.delayTime.value = 0.35;
+  delayFeedback = audioCtx.createGain();
+  delayFeedback.gain.value = 0.3;
+  delayNode.connect(delayFeedback);
+  delayFeedback.connect(delayNode);
+
+  // Analyser
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+
+  // Dry + wet routing
+  const reverbGain = audioCtx.createGain();
+  reverbGain.gain.value = 0.4;
+  const delayGain = audioCtx.createGain();
+  delayGain.gain.value = 0.3;
+
+  masterGain.connect(audioCtx.destination);
+  masterGain.connect(reverbNode);
+  reverbNode.connect(reverbGain);
+  reverbGain.connect(audioCtx.destination);
+  masterGain.connect(delayNode);
+  delayNode.connect(delayGain);
+  delayGain.connect(audioCtx.destination);
+
+  masterGain.connect(analyser);
+
+  // Store wet gains for control
+  window._reverbGain = reverbGain;
+  window._delayGain = delayGain;
+}
+
+// Scales (semitone intervals from root)
+const SCALES = {
+  pentatonic: [0, 2, 4, 7, 9],
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  blues: [0, 3, 5, 6, 7, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+};
+
+function getFrequency(normX) {
+  const scale = SCALES[document.getElementById('scale').value];
+  const baseNote = 48; // C3 MIDI
+  const range = 36; // 3 octaves
+  const semitone = normX * range;
+  const octave = Math.floor(semitone / 12);
+  const degree = semitone % 12;
+
+  // Snap to nearest scale degree
+  let closest = scale[0];
+  let minDist = 999;
+  for (const s of scale) {
+    const d = Math.abs(degree - s);
+    if (d < minDist) { minDist = d; closest = s; }
+  }
+
+  const midi = baseNote + octave * 12 + closest;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function getFilterFreq(normY) {
+  // Y: 0 (bottom) = low filter, 1 (top) = high filter
+  return 200 + (1 - normY) * 8000;
+}
+
+// Active voices
+const voices = new Map();
+
+function startVoice(id, normX, normY) {
+  initAudio();
+  stopVoice(id);
+
+  const freq = getFrequency(normX);
+  const filterFreq = getFilterFreq(normY);
+  const attackTime = parseFloat(document.getElementById('attack').value);
+
+  const osc = audioCtx.createOscillator();
+  osc.type = document.getElementById('waveform').value;
+  osc.frequency.value = freq;
+
+  // Second oscillator slightly detuned
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = osc.type;
+  osc2.frequency.value = freq;
+  osc2.detune.value = 7;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = filterFreq;
+  filter.Q.value = 2;
+
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + attackTime);
+
+  osc.connect(filter);
+  osc2.connect(filter);
+  filter.connect(gain);
+  gain.connect(masterGain);
+
+  osc.start();
+  osc2.start();
+
+  voices.set(id, { osc, osc2, filter, gain, freq });
+}
+
+function updateVoice(id, normX, normY) {
+  const v = voices.get(id);
+  if (!v) return;
+  const freq = getFrequency(normX);
+  const filterFreq = getFilterFreq(normY);
+  v.osc.frequency.linearRampToValueAtTime(freq, audioCtx.currentTime + 0.05);
+  v.osc2.frequency.linearRampToValueAtTime(freq, audioCtx.currentTime + 0.05);
+  v.osc2.detune.value = 7;
+  v.filter.frequency.linearRampToValueAtTime(filterFreq, audioCtx.currentTime + 0.05);
+  v.freq = freq;
+}
+
+function stopVoice(id) {
+  const v = voices.get(id);
+  if (!v) return;
+  const releaseTime = parseFloat(document.getElementById('release').value);
+  const now = audioCtx.currentTime;
+  v.gain.gain.cancelScheduledValues(now);
+  v.gain.gain.setValueAtTime(v.gain.gain.value, now);
+  v.gain.gain.linearRampToValueAtTime(0, now + releaseTime);
+  v.osc.stop(now + releaseTime + 0.1);
+  v.osc2.stop(now + releaseTime + 0.1);
+  voices.delete(id);
+}
+
+// Control listeners
+document.getElementById('reverb').addEventListener('input', e => {
+  if (window._reverbGain) window._reverbGain.gain.value = parseFloat(e.target.value);
+});
+document.getElementById('delay').addEventListener('input', e => {
+  if (window._delayGain) window._delayGain.gain.value = parseFloat(e.target.value);
+  if (delayFeedback) delayFeedback.gain.value = parseFloat(e.target.value);
+});
+
+// Pad interaction
+const padArea = document.getElementById('pad-area');
+const padCanvas = document.getElementById('pad-canvas');
+
+function getNorm(e) {
+  const rect = padArea.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+    y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
+  };
+}
+
+let mouseIsDown = false;
+
+padArea.addEventListener('mousedown', e => {
+  mouseIsDown = true;
+  const n = getNorm(e);
+  startVoice('mouse', n.x, n.y);
+  spawnRipple(e.clientX, e.clientY);
+});
+
+padArea.addEventListener('mousemove', e => {
+  if (!mouseIsDown) return;
+  const n = getNorm(e);
+  updateVoice('mouse', n.x, n.y);
+});
+
+window.addEventListener('mouseup', () => {
+  if (mouseIsDown) { mouseIsDown = false; stopVoice('mouse'); }
+});
+
+// Touch support
+padArea.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    const n = getNorm(t);
+    startVoice('t' + t.identifier, n.x, n.y);
+    spawnRipple(t.clientX, t.clientY);
+  }
+}, { passive: false });
+
+padArea.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    const n = getNorm(t);
+    updateVoice('t' + t.identifier, n.x, n.y);
+  }
+}, { passive: false });
+
+padArea.addEventListener('touchend', e => {
+  for (const t of e.changedTouches) stopVoice('t' + t.identifier);
+});
+
+// Visual ripples
+const ripples = [];
+function spawnRipple(x, y) {
+  const rect = padArea.getBoundingClientRect();
+  ripples.push({ x: x - rect.left, y: y - rect.top, t: 0, maxT: 60 });
+}
+
+// Canvas setup + visualization
+const visCanvas = document.getElementById('visualizer');
+let vCtx, pCtx;
+
+function resizeCanvases() {
+  const rect = padArea.getBoundingClientRect();
+  padCanvas.width = visCanvas.width = rect.width;
+  padCanvas.height = visCanvas.height = rect.height;
+  pCtx = padCanvas.getContext('2d');
+  vCtx = visCanvas.getContext('2d');
+  drawGrid();
+}
+
+function drawGrid() {
+  if (!pCtx) return;
+  const w = padCanvas.width, h = padCanvas.height;
+  pCtx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  pCtx.strokeStyle = 'rgba(255,255,255,0.03)';
+  pCtx.lineWidth = 1;
+  for (let i = 1; i < 12; i++) {
+    const x = (i / 12) * w;
+    pCtx.beginPath(); pCtx.moveTo(x, 0); pCtx.lineTo(x, h); pCtx.stroke();
+  }
+  for (let i = 1; i < 8; i++) {
+    const y = (i / 8) * h;
+    pCtx.beginPath(); pCtx.moveTo(0, y); pCtx.lineTo(w, y); pCtx.stroke();
+  }
+
+  // Note labels along bottom
+  const scale = SCALES[document.getElementById('scale').value];
+  const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  pCtx.fillStyle = 'rgba(255,255,255,0.08)';
+  pCtx.font = '9px system-ui';
+  pCtx.textAlign = 'center';
+  for (let oct = 0; oct < 3; oct++) {
+    for (const s of scale) {
+      const semitone = oct * 12 + s;
+      const x = (semitone / 36) * w;
+      pCtx.fillText(noteNames[s] + (oct + 3), x, h - 4);
+    }
+  }
+}
+
+function drawVis() {
+  if (!vCtx || !analyser) return;
+  const w = visCanvas.width, h = visCanvas.height;
+  vCtx.clearRect(0, 0, w, h);
+
+  // Waveform
+  const bufLen = analyser.frequencyBinCount;
+  const data = new Uint8Array(bufLen);
+  analyser.getByteTimeDomainData(data);
+
+  vCtx.beginPath();
+  vCtx.strokeStyle = 'rgba(123,104,238,0.25)';
+  vCtx.lineWidth = 1.5;
+  for (let i = 0; i < bufLen; i++) {
+    const x = (i / bufLen) * w;
+    const y = (data[i] / 255) * h;
+    if (i === 0) vCtx.moveTo(x, y); else vCtx.lineTo(x, y);
+  }
+  vCtx.stroke();
+
+  // Ripples
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    r.t++;
+    const progress = r.t / r.maxT;
+    const radius = progress * 80;
+    const alpha = 1 - progress;
+    vCtx.strokeStyle = `rgba(123,104,238,${alpha * 0.4})`;
+    vCtx.lineWidth = 1;
+    vCtx.beginPath();
+    vCtx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+    vCtx.stroke();
+    if (r.t >= r.maxT) ripples.splice(i, 1);
+  }
+
+  requestAnimationFrame(drawVis);
+}
+
+// Keyboard at bottom
+const keyboardEl = document.getElementById('keyboard');
+const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const keyMap = 'zsxdcvgbhnjm,l.;/'; // keyboard mapping
+
+for (let i = 0; i < 24; i++) {
+  const name = noteNames[i % 12] + (3 + Math.floor(i / 12));
+  const isBlack = [1,3,6,8,10].includes(i % 12);
+  const key = document.createElement('div');
+  key.className = 'key' + (isBlack ? ' black' : '');
+  key.textContent = name;
+  key.dataset.midi = 48 + i;
+  key.addEventListener('mousedown', () => playKey(i, key));
+  key.addEventListener('mouseup', () => releaseKey(i, key));
+  key.addEventListener('mouseleave', () => releaseKey(i, key));
+  keyboardEl.appendChild(key);
+}
+
+function playKey(idx, el) {
+  initAudio();
+  const midi = 48 + idx;
+  const freq = 440 * Math.pow(2, (midi - 69) / 12);
+  const id = 'key' + idx;
+
+  if (voices.has(id)) return;
+  el.classList.add('active');
+
+  const attackTime = parseFloat(document.getElementById('attack').value);
+  const osc = audioCtx.createOscillator();
+  osc.type = document.getElementById('waveform').value;
+  osc.frequency.value = freq;
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = osc.type;
+  osc2.frequency.value = freq;
+  osc2.detune.value = 7;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 5000;
+  filter.Q.value = 1;
+
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + attackTime);
+
+  osc.connect(filter); osc2.connect(filter);
+  filter.connect(gain); gain.connect(masterGain);
+  osc.start(); osc2.start();
+
+  voices.set(id, { osc, osc2, filter, gain, freq });
+}
+
+function releaseKey(idx, el) {
+  el.classList.remove('active');
+  stopVoice('key' + idx);
+}
+
+// Computer keyboard support
+const keyboardKeys = {};
+document.addEventListener('keydown', e => {
+  const idx = keyMap.indexOf(e.key.toLowerCase());
+  if (idx === -1 || keyboardKeys[e.key]) return;
+  keyboardKeys[e.key] = true;
+  const el = keyboardEl.children[idx];
+  if (el) playKey(idx, el);
+});
+
+document.addEventListener('keyup', e => {
+  const idx = keyMap.indexOf(e.key.toLowerCase());
+  if (idx === -1) return;
+  keyboardKeys[e.key] = false;
+  const el = keyboardEl.children[idx];
+  if (el) releaseKey(idx, el);
+});
+
+// Scale change redraws grid
+document.getElementById('scale').addEventListener('change', drawGrid);
+
+// Init
+window.addEventListener('load', () => { resizeCanvases(); drawVis(); });
+window.addEventListener('resize', resizeCanvases);
+</script>
+</body>
+</html>

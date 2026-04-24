@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Earth Day Virtual Forest</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  canvas { display: block; }
+
+  #ui {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  h1 {
+    font-size: 2rem;
+    color: #2d5016;
+    text-shadow: 0 1px 3px rgba(255,255,255,0.8);
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 0.95rem;
+    color: #4a7c28;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.7);
+  }
+
+  #stats {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 24px;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    padding: 12px 28px;
+    border-radius: 40px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    z-index: 10;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2d5016;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6b8f4a;
+  }
+
+  #controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+  }
+
+  .tree-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.9);
+  }
+
+  .tree-btn:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  }
+
+  .tree-btn.active {
+    border-color: #2d5016;
+    background: #e8f5d4;
+  }
+
+  #time-controls {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+  }
+
+  #time-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    background: rgba(255,255,255,0.9);
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    font-size: 1.2rem;
+    transition: transform 0.2s;
+  }
+
+  #time-btn:hover { transform: scale(1.15); }
+
+  .particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 5;
+    font-size: 1rem;
+    animation: float-up 2s ease-out forwards;
+  }
+
+  @keyframes float-up {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
+  }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <h1>Earth Day Virtual Forest</h1>
+  <div class="subtitle">Click anywhere to plant a tree</div>
+</div>
+
+<div id="controls">
+  <button class="tree-btn active" data-type="0" title="Oak">🌳</button>
+  <button class="tree-btn" data-type="1" title="Pine">🌲</button>
+  <button class="tree-btn" data-type="2" title="Cherry Blossom">🌸</button>
+  <button class="tree-btn" data-type="3" title="Palm">🌴</button>
+  <button class="tree-btn" data-type="4" title="Flower">🌻</button>
+</div>
+
+<div id="time-controls">
+  <button id="time-btn" title="Toggle day/night">🌤️</button>
+</div>
+
+<div id="stats">
+  <div class="stat">
+    <div class="stat-value" id="tree-count">0</div>
+    <div class="stat-label">Trees</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="co2-absorbed">0</div>
+    <div class="stat-label">kg CO₂/yr</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="o2-produced">0</div>
+    <div class="stat-label">kg O₂/yr</div>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+let selectedType = 0;
+let isNight = false;
+let time = 0;
+const trees = [];
+const animals = [];
+const clouds = [];
+const fireflies = [];
+
+const TREE_TYPES = [
+  { name: 'Oak',    co2: 22, o2: 120, trunkColor: '#5a3a1a', colors: ['#2d5016','#3a6b1e','#4a8528','#68a33e'] },
+  { name: 'Pine',   co2: 18, o2: 100, trunkColor: '#4a2d0a', colors: ['#1a4a2a','#1f5c33','#256e3c','#2a7a42'] },
+  { name: 'Cherry', co2: 15, o2: 80,  trunkColor: '#5a3020', colors: ['#d4688a','#e87fa0','#f5a0b8','#fcc4d4'] },
+  { name: 'Palm',   co2: 12, o2: 65,  trunkColor: '#7a5a2a', colors: ['#2a7a28','#3a8a35','#4a9a42','#5aaa4f'] },
+  { name: 'Flower', co2: 5,  o2: 20,  trunkColor: '#3a6b1e', colors: ['#f5c542','#e8a020','#d4882a','#c07030'] },
+];
+
+function initClouds() {
+  for (let i = 0; i < 6; i++) {
+    clouds.push({
+      x: Math.random() * W,
+      y: 40 + Math.random() * 120,
+      w: 100 + Math.random() * 150,
+      speed: 0.2 + Math.random() * 0.4,
+      opacity: 0.3 + Math.random() * 0.3,
+    });
+  }
+}
+initClouds();
+
+function spawnAnimal(x, groundY) {
+  if (animals.length > 15) return;
+  const types = ['🐿️','🦊','🐇','🦌','🐦','🦋','🐝'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const isFlying = '🐦🦋🐝'.includes(type);
+  animals.push({
+    x, y: isFlying ? groundY - 40 - Math.random() * 60 : groundY,
+    type, isFlying,
+    vx: (Math.random() - 0.5) * 1.5,
+    vy: isFlying ? (Math.random() - 0.5) * 0.5 : 0,
+    life: 300 + Math.random() * 600,
+    age: 0,
+    size: 14 + Math.random() * 8,
+  });
+}
+
+function plantTree(x, y) {
+  const type = TREE_TYPES[selectedType];
+  const groundY = getGroundY(x);
+  const treeY = Math.min(y, groundY);
+
+  trees.push({
+    x, y: treeY,
+    type: selectedType,
+    growth: 0,
+    maxHeight: 60 + Math.random() * 80,
+    swayOffset: Math.random() * Math.PI * 2,
+    swayAmount: 0.5 + Math.random() * 1.5,
+    leafClusters: generateLeafClusters(selectedType),
+    age: 0,
+  });
+
+  if (Math.random() < 0.4) spawnAnimal(x, treeY);
+  emitParticle(x, treeY - 20, '🌱');
+  updateStats();
+}
+
+function generateLeafClusters(type) {
+  const count = type === 4 ? 1 : 5 + Math.floor(Math.random() * 6);
+  const clusters = [];
+  for (let i = 0; i < count; i++) {
+    clusters.push({
+      ox: (Math.random() - 0.5) * 40,
+      oy: -Math.random() * 50 - 10,
+      r: 8 + Math.random() * 14,
+      colorIdx: Math.floor(Math.random() * 4),
+    });
+  }
+  return clusters;
+}
+
+function getGroundY(x) {
+  return H - 80 + Math.sin(x * 0.005) * 20 + Math.sin(x * 0.015) * 10;
+}
+
+function drawSky() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  if (isNight) {
+    grad.addColorStop(0, '#0a1628');
+    grad.addColorStop(0.5, '#152238');
+    grad.addColorStop(1, '#1a3048');
+  } else {
+    grad.addColorStop(0, '#87CEEB');
+    grad.addColorStop(0.4, '#a8dff0');
+    grad.addColorStop(1, '#d4f0d4');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  if (isNight) drawStars();
+}
+
+let stars = [];
+function drawStars() {
+  if (stars.length === 0) {
+    for (let i = 0; i < 200; i++) {
+      stars.push({ x: Math.random() * W, y: Math.random() * H * 0.6, r: Math.random() * 1.5, twinkle: Math.random() * Math.PI * 2 });
+    }
+  }
+  stars.forEach(s => {
+    const brightness = 0.4 + 0.6 * Math.sin(time * 0.02 + s.twinkle);
+    ctx.fillStyle = `rgba(255,255,240,${brightness})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = isNight ? '#f0e68c' : '#fff4a0';
+  const moonX = W - 100, moonY = 80;
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = isNight ? '#0a1628' : '#87CEEB';
+  ctx.beginPath();
+  ctx.arc(moonX + 10, moonY - 5, 26, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawGround() {
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 4) {
+    ctx.lineTo(x, getGroundY(x));
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(0, H - 120, 0, H);
+  if (isNight) {
+    grad.addColorStop(0, '#1a3a12');
+    grad.addColorStop(1, '#0f2a0a');
+  } else {
+    grad.addColorStop(0, '#4a8528');
+    grad.addColorStop(1, '#3a6b1e');
+  }
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  if (!isNight) {
+    for (let x = 0; x < W; x += 8) {
+      const gy = getGroundY(x);
+      const h = 4 + Math.sin(x * 0.3 + time * 0.05) * 3;
+      ctx.strokeStyle = `rgba(60,120,30,${0.3 + Math.random() * 0.2})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, gy);
+      ctx.lineTo(x + Math.sin(time * 0.03 + x) * 2, gy - h);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawClouds() {
+  clouds.forEach(c => {
+    c.x += c.speed * (isNight ? 0.3 : 1);
+    if (c.x > W + c.w) c.x = -c.w;
+    ctx.fillStyle = isNight
+      ? `rgba(40,60,80,${c.opacity * 0.5})`
+      : `rgba(255,255,255,${c.opacity})`;
+    drawCloudShape(c.x, c.y, c.w);
+  });
+}
+
+function drawCloudShape(x, y, w) {
+  const h = w * 0.35;
+  ctx.beginPath();
+  ctx.ellipse(x, y, w * 0.5, h * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x - w * 0.25, y + h * 0.1, w * 0.3, h * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.2, y + h * 0.05, w * 0.35, h * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawTree(tree) {
+  const t = tree;
+  const growth = Math.min(t.growth, 1);
+  const h = t.maxHeight * growth;
+  const sway = Math.sin(time * 0.015 + t.swayOffset) * t.swayAmount * growth;
+  const type = TREE_TYPES[t.type];
+
+  ctx.save();
+  ctx.translate(t.x, t.y);
+
+  if (t.type === 3) {
+    drawPalm(t, h, sway, growth, type);
+  } else if (t.type === 4) {
+    drawFlower(t, h, sway, growth, type);
+  } else if (t.type === 1) {
+    drawPine(t, h, sway, growth, type);
+  } else {
+    drawDeciduous(t, h, sway, growth, type);
+  }
+
+  ctx.restore();
+}
+
+function drawDeciduous(t, h, sway, growth, type) {
+  const trunkW = 3 + growth * 5;
+  ctx.strokeStyle = type.trunkColor;
+  ctx.lineWidth = trunkW;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(sway * 0.5, -h * 0.5, sway, -h);
+  ctx.stroke();
+
+  if (growth > 0.3) {
+    const branchGrowth = (growth - 0.3) / 0.7;
+    ctx.lineWidth = trunkW * 0.5;
+    for (let i = 0; i < 3; i++) {
+      const by = -h * (0.4 + i * 0.2);
+      const bx = sway * (by / -h);
+      const dir = i % 2 === 0 ? 1 : -1;
+      const blen = 15 * branchGrowth * (1 - i * 0.2);
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + dir * blen, by - blen * 0.5);
+      ctx.stroke();
+    }
+  }
+
+  if (growth > 0.2) {
+    const leafGrowth = Math.min((growth - 0.2) / 0.3, 1);
+    t.leafClusters.forEach(c => {
+      const lx = sway + c.ox * growth;
+      const ly = -h + c.oy * growth;
+      const r = c.r * leafGrowth;
+      const color = type.colors[c.colorIdx];
+      const nightAdjust = isNight ? 'aa' : '';
+      ctx.fillStyle = color + nightAdjust;
+      ctx.beginPath();
+      ctx.arc(lx, ly, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+}
+
+function drawPine(t, h, sway, growth, type) {
+  const trunkW = 2 + growth * 4;
+  ctx.strokeStyle = type.trunkColor;
+  ctx.lineWidth = trunkW;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(sway * 0.3, -h * 0.4);
+  ctx.stroke();
+
+  if (growth > 0.15) {
+    const leafGrowth = Math.min((growth - 0.15) / 0.4, 1);
+    const layers = 4;
+    for (let i = 0; i < layers; i++) {
+      const ly = -h * (0.25 + i * 0.2) * growth;
+      const lw = (25 - i * 4) * leafGrowth;
+      const lh = 20 * leafGrowth;
+      const lx = sway * (-ly / h);
+      ctx.fillStyle = type.colors[i % type.colors.length] + (isNight ? 'aa' : '');
+      ctx.beginPath();
+      ctx.moveTo(lx, ly - lh);
+      ctx.lineTo(lx - lw, ly);
+      ctx.lineTo(lx + lw, ly);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+}
+
+function drawPalm(t, h, sway, growth, type) {
+  const trunkW = 3 + growth * 4;
+  ctx.strokeStyle = type.trunkColor;
+  ctx.lineWidth = trunkW;
+  ctx.lineCap = 'round';
+
+  const segments = 8;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  for (let i = 1; i <= segments; i++) {
+    const pct = i / segments;
+    const px = sway * pct + Math.sin(pct * Math.PI) * 5;
+    const py = -h * pct;
+    ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  if (growth > 0.3) {
+    const leafGrowth = Math.min((growth - 0.3) / 0.4, 1);
+    const topX = sway;
+    const topY = -h;
+    const fronds = 7;
+    for (let i = 0; i < fronds; i++) {
+      const angle = (i / fronds) * Math.PI * 2 + time * 0.005;
+      const len = 35 * leafGrowth;
+      const droop = 15 * leafGrowth;
+      const ex = topX + Math.cos(angle) * len;
+      const ey = topY + Math.sin(angle) * len * 0.4 + droop;
+      ctx.strokeStyle = type.colors[i % type.colors.length] + (isNight ? 'aa' : '');
+      ctx.lineWidth = 3 * leafGrowth;
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.quadraticCurveTo(topX + Math.cos(angle) * len * 0.6, topY - 10, ex, ey);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawFlower(t, h, sway, growth, type) {
+  const stemH = h * 0.8;
+  ctx.strokeStyle = type.trunkColor;
+  ctx.lineWidth = 2 + growth;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(sway * 0.5, -stemH * 0.5, sway, -stemH);
+  ctx.stroke();
+
+  if (growth > 0.4) {
+    const leafGrowth = Math.min((growth - 0.4) / 0.3, 1);
+    const fx = sway;
+    const fy = -stemH;
+    const petals = 8;
+    const petalR = 8 * leafGrowth;
+    const petalDist = 10 * leafGrowth;
+    for (let i = 0; i < petals; i++) {
+      const angle = (i / petals) * Math.PI * 2 + time * 0.01;
+      ctx.fillStyle = type.colors[i % type.colors.length] + (isNight ? 'aa' : '');
+      ctx.beginPath();
+      ctx.arc(fx + Math.cos(angle) * petalDist, fy + Math.sin(angle) * petalDist, petalR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = isNight ? '#8a6a10' : '#c49520';
+    ctx.beginPath();
+    ctx.arc(fx, fy, 5 * leafGrowth, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawAnimals() {
+  animals.forEach(a => {
+    ctx.font = `${a.size}px serif`;
+    ctx.textAlign = 'center';
+    const alpha = a.age < 30 ? a.age / 30 : a.life - a.age < 30 ? (a.life - a.age) / 30 : 1;
+    ctx.globalAlpha = alpha;
+    ctx.fillText(a.type, a.x, a.y);
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawFireflies() {
+  if (!isNight) return;
+  if (fireflies.length < trees.length * 2 && Math.random() < 0.05) {
+    const t = trees[Math.floor(Math.random() * trees.length)];
+    if (t) {
+      fireflies.push({
+        x: t.x + (Math.random() - 0.5) * 60,
+        y: t.y - Math.random() * t.maxHeight * t.growth,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.3,
+        phase: Math.random() * Math.PI * 2,
+        life: 200 + Math.random() * 400,
+        age: 0,
+      });
+    }
+  }
+
+  fireflies.forEach(f => {
+    const glow = 0.3 + 0.7 * Math.sin(time * 0.05 + f.phase);
+    const alpha = f.age < 30 ? f.age / 30 : f.life - f.age < 30 ? (f.life - f.age) / 30 : 1;
+    ctx.fillStyle = `rgba(200,255,100,${glow * alpha})`;
+    ctx.shadowColor = 'rgba(200,255,100,0.8)';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+}
+
+function emitParticle(x, y, emoji) {
+  const el = document.createElement('div');
+  el.className = 'particle';
+  el.textContent = emoji;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+function updateStats() {
+  const count = trees.length;
+  let co2 = 0, o2 = 0;
+  trees.forEach(t => {
+    const g = Math.min(t.growth, 1);
+    co2 += TREE_TYPES[t.type].co2 * g;
+    o2 += TREE_TYPES[t.type].o2 * g;
+  });
+  document.getElementById('tree-count').textContent = count;
+  document.getElementById('co2-absorbed').textContent = Math.round(co2);
+  document.getElementById('o2-produced').textContent = Math.round(o2);
+}
+
+function update() {
+  time++;
+
+  trees.forEach(t => {
+    t.age++;
+    if (t.growth < 1) t.growth += 0.003;
+  });
+
+  animals.forEach(a => {
+    a.age++;
+    a.x += a.vx;
+    if (a.isFlying) a.y += a.vy + Math.sin(time * 0.05 + a.x) * 0.3;
+    if (a.x < -20 || a.x > W + 20) a.vx *= -1;
+  });
+  for (let i = animals.length - 1; i >= 0; i--) {
+    if (animals[i].age > animals[i].life) animals.splice(i, 1);
+  }
+
+  fireflies.forEach(f => {
+    f.age++;
+    f.x += f.vx + Math.sin(time * 0.02 + f.phase) * 0.3;
+    f.y += f.vy + Math.cos(time * 0.025 + f.phase) * 0.2;
+  });
+  for (let i = fireflies.length - 1; i >= 0; i--) {
+    if (fireflies[i].age > fireflies[i].life) fireflies.splice(i, 1);
+  }
+
+  if (time % 60 === 0) updateStats();
+}
+
+function draw() {
+  drawSky();
+  drawClouds();
+  drawGround();
+  trees.forEach(drawTree);
+  drawAnimals();
+  drawFireflies();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  plantTree(e.clientX - rect.left, e.clientY - rect.top);
+});
+
+document.querySelectorAll('.tree-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.tree-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedType = parseInt(btn.dataset.type);
+  });
+});
+
+document.getElementById('time-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  isNight = !isNight;
+  document.getElementById('time-btn').textContent = isNight ? '🌙' : '🌤️';
+});
+
+// Plant some starter trees
+for (let i = 0; i < 8; i++) {
+  const x = 80 + Math.random() * (W - 160);
+  selectedType = Math.floor(Math.random() * 5);
+  plantTree(x, getGroundY(x));
+}
+selectedType = 0;
+document.querySelectorAll('.tree-btn').forEach(b => b.classList.remove('active'));
+document.querySelector('[data-type="0"]').classList.add('active');
+
+loop();
+</script>
+</body>
+</html>

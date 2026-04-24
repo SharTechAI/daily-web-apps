@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "earth-day-forest",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "earth-day-forest", "-l", "3456"],
+      "port": 3456
+    },
+    {
+      "name": "particle-life",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "particle-life", "-l", "3457"],
+      "port": 3457
+    }
+  ]
+}

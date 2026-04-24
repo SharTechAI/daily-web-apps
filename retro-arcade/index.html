@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retro Arcade</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @font-face {
+    font-family: 'Arcade';
+    src: local('Courier New');
+  }
+
+  body {
+    background: #0a0a1a;
+    color: #e0e0ff;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .scanlines {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 1000;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+  }
+
+  header {
+    text-align: center;
+    padding: 30px 20px 10px;
+    position: relative;
+  }
+
+  header h1 {
+    font-size: 3rem;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #ff0055, #ffaa00, #00ff88, #00aaff, #aa00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(0 0 20px rgba(255, 0, 85, 0.4));
+    animation: glow 3s ease-in-out infinite alternate;
+  }
+
+  @keyframes glow {
+    from { filter: drop-shadow(0 0 10px rgba(255, 0, 85, 0.3)); }
+    to   { filter: drop-shadow(0 0 30px rgba(0, 170, 255, 0.5)); }
+  }
+
+  header .subtitle {
+    color: #666;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    letter-spacing: 4px;
+  }
+
+  .scoreboard {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 15px;
+    margin: 10px auto;
+    max-width: 700px;
+  }
+
+  .score-item {
+    text-align: center;
+  }
+
+  .score-item .label {
+    font-size: 0.7rem;
+    color: #555;
+    letter-spacing: 2px;
+  }
+
+  .score-item .value {
+    font-size: 1.4rem;
+    color: #ffaa00;
+    text-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+  }
+
+  .games-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 30px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .game-card {
+    background: #111128;
+    border: 2px solid #222244;
+    border-radius: 12px;
+    padding: 20px;
+    width: 340px;
+    text-align: center;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .game-card:hover {
+    border-color: #444488;
+    box-shadow: 0 0 30px rgba(100, 100, 200, 0.15);
+  }
+
+  .game-card h2 {
+    font-size: 1.3rem;
+    margin-bottom: 5px;
+    letter-spacing: 3px;
+  }
+
+  .game-card .game-desc {
+    font-size: 0.7rem;
+    color: #555;
+    margin-bottom: 12px;
+  }
+
+  canvas {
+    background: #050510;
+    border: 1px solid #333355;
+    border-radius: 4px;
+    display: block;
+    margin: 0 auto;
+    image-rendering: pixelated;
+  }
+
+  .game-controls {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  button {
+    background: #222244;
+    color: #aaaadd;
+    border: 1px solid #333366;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+
+  button:hover {
+    background: #333366;
+    color: #ffffff;
+    border-color: #5555aa;
+    box-shadow: 0 0 10px rgba(80, 80, 200, 0.3);
+  }
+
+  .game-score {
+    margin-top: 8px;
+    font-size: 1rem;
+    color: #00ff88;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+  }
+
+  .game-card.snake h2 { color: #00ff88; }
+  .game-card.breakout h2 { color: #00aaff; }
+  .game-card.reaction h2 { color: #ff0055; }
+
+  .reaction-zone {
+    width: 296px;
+    height: 296px;
+    background: #050510;
+    border: 1px solid #333355;
+    border-radius: 4px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+  }
+
+  .reaction-zone.waiting {
+    background: #1a0000;
+    color: #ff0055;
+  }
+
+  .reaction-zone.ready {
+    background: #001a00;
+    color: #00ff88;
+    animation: pulse 0.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes pulse {
+    from { box-shadow: inset 0 0 20px rgba(0,255,100,0.1); }
+    to   { box-shadow: inset 0 0 40px rgba(0,255,100,0.25); }
+  }
+
+  .reaction-zone.result {
+    color: #ffaa00;
+  }
+
+  .reaction-zone.too-early {
+    background: #1a0a00;
+    color: #ff5500;
+  }
+
+  .best-times {
+    margin-top: 8px;
+    font-size: 0.7rem;
+    color: #555;
+  }
+
+  footer {
+    text-align: center;
+    padding: 30px;
+    color: #333;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="scanlines"></div>
+
+<header>
+  <h1>Retro Arcade</h1>
+  <p class="subtitle">INSERT COIN TO PLAY</p>
+</header>
+
+<div class="scoreboard">
+  <div class="score-item">
+    <div class="label">SNAKE BEST</div>
+    <div class="value" id="snake-best">0</div>
+  </div>
+  <div class="score-item">
+    <div class="label">BREAKOUT BEST</div>
+    <div class="value" id="breakout-best">0</div>
+  </div>
+  <div class="score-item">
+    <div class="label">BEST REACTION</div>
+    <div class="value" id="reaction-best">---</div>
+  </div>
+</div>
+
+<div class="games-container">
+
+  <!-- SNAKE -->
+  <div class="game-card snake">
+    <h2>SNAKE</h2>
+    <p class="game-desc">ARROW KEYS OR WASD TO MOVE</p>
+    <canvas id="snake-canvas" width="300" height="300"></canvas>
+    <div class="game-score">SCORE: <span id="snake-score">0</span></div>
+    <div class="game-controls">
+      <button onclick="snakeGame.start()">START</button>
+    </div>
+  </div>
+
+  <!-- BREAKOUT -->
+  <div class="game-card breakout">
+    <h2>BREAKOUT</h2>
+    <p class="game-desc">MOUSE OR LEFT/RIGHT TO MOVE PADDLE</p>
+    <canvas id="breakout-canvas" width="300" height="300"></canvas>
+    <div class="game-score">SCORE: <span id="breakout-score">0</span></div>
+    <div class="game-controls">
+      <button onclick="breakoutGame.start()">START</button>
+    </div>
+  </div>
+
+  <!-- REACTION -->
+  <div class="game-card reaction">
+    <h2>REACTION</h2>
+    <p class="game-desc">CLICK WHEN THE SCREEN TURNS GREEN</p>
+    <div class="reaction-zone" id="reaction-zone" onclick="reactionGame.click()">
+      CLICK START TO PLAY
+    </div>
+    <div class="game-score" id="reaction-time">---</div>
+    <div class="best-times" id="reaction-history"></div>
+    <div class="game-controls">
+      <button onclick="reactionGame.start()">START</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>RETRO ARCADE &mdash; 2026</footer>
+
+<script>
+// ============== SNAKE ==============
+const snakeGame = (() => {
+  const canvas = document.getElementById('snake-canvas');
+  const ctx = canvas.getContext('2d');
+  const GRID = 15;
+  const CELL = canvas.width / GRID;
+  let snake, dir, nextDir, food, score, bestScore, running, interval;
+
+  function init() {
+    snake = [{x: 7, y: 7}];
+    dir = {x: 1, y: 0};
+    nextDir = {x: 1, y: 0};
+    score = 0;
+    bestScore = parseInt(localStorage.getItem('snakeBest') || '0');
+    document.getElementById('snake-best').textContent = bestScore;
+    placeFood();
+    draw();
+  }
+
+  function placeFood() {
+    do {
+      food = {x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID)};
+    } while (snake.some(s => s.x === food.x && s.y === food.y));
+  }
+
+  function draw() {
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid dots
+    ctx.fillStyle = '#0a0a20';
+    for (let x = 0; x < GRID; x++)
+      for (let y = 0; y < GRID; y++)
+        ctx.fillRect(x * CELL + CELL/2 - 0.5, y * CELL + CELL/2 - 0.5, 1, 1);
+
+    // Food
+    ctx.fillStyle = '#ff0055';
+    ctx.shadowColor = '#ff0055';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(food.x * CELL + CELL/2, food.y * CELL + CELL/2, CELL/3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Snake
+    snake.forEach((seg, i) => {
+      const brightness = 1 - (i / snake.length) * 0.6;
+      ctx.fillStyle = `rgba(0, ${Math.floor(255 * brightness)}, ${Math.floor(136 * brightness)}, 1)`;
+      ctx.shadowColor = '#00ff88';
+      ctx.shadowBlur = i === 0 ? 10 : 3;
+      ctx.fillRect(seg.x * CELL + 1, seg.y * CELL + 1, CELL - 2, CELL - 2);
+    });
+    ctx.shadowBlur = 0;
+
+    document.getElementById('snake-score').textContent = score;
+  }
+
+  function update() {
+    dir = nextDir;
+    const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID ||
+        snake.some(s => s.x === head.x && s.y === head.y)) {
+      gameOver();
+      return;
+    }
+
+    snake.unshift(head);
+
+    if (head.x === food.x && head.y === food.y) {
+      score += 10;
+      if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem('snakeBest', bestScore);
+        document.getElementById('snake-best').textContent = bestScore;
+      }
+      placeFood();
+    } else {
+      snake.pop();
+    }
+
+    draw();
+  }
+
+  function gameOver() {
+    running = false;
+    clearInterval(interval);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ff0055';
+    ctx.font = '20px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 10);
+    ctx.fillStyle = '#ffaa00';
+    ctx.font = '14px Courier New';
+    ctx.fillText('Score: ' + score, canvas.width/2, canvas.height/2 + 15);
+  }
+
+  function start() {
+    if (running) {
+      clearInterval(interval);
+    }
+    running = true;
+    init();
+    interval = setInterval(update, 120);
+  }
+
+  document.addEventListener('keydown', e => {
+    const map = {
+      ArrowUp: {x:0,y:-1}, ArrowDown: {x:0,y:1},
+      ArrowLeft: {x:-1,y:0}, ArrowRight: {x:1,y:0},
+      w: {x:0,y:-1}, s: {x:0,y:1},
+      a: {x:-1,y:0}, d: {x:1,y:0},
+      W: {x:0,y:-1}, S: {x:0,y:1},
+      A: {x:-1,y:0}, D: {x:1,y:0}
+    };
+    const nd = map[e.key];
+    if (nd && running) {
+      if (nd.x !== -dir.x || nd.y !== -dir.y) {
+        nextDir = nd;
+      }
+      e.preventDefault();
+    }
+  });
+
+  init();
+  return { start };
+})();
+
+// ============== BREAKOUT ==============
+const breakoutGame = (() => {
+  const canvas = document.getElementById('breakout-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const COLS = 8, ROWS = 5;
+  const BRICK_W = W / COLS - 4;
+  const BRICK_H = 14;
+  const PADDLE_W = 60, PADDLE_H = 10;
+  const BALL_R = 4;
+
+  let bricks, paddle, ball, score, bestScore, running, animId;
+  const colors = ['#ff0055', '#ff5500', '#ffaa00', '#00ff88', '#00aaff'];
+
+  function init() {
+    bricks = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        bricks.push({
+          x: c * (BRICK_W + 4) + 4,
+          y: r * (BRICK_H + 4) + 30,
+          w: BRICK_W, h: BRICK_H,
+          color: colors[r], alive: true
+        });
+
+    paddle = {x: W/2 - PADDLE_W/2, y: H - 25, w: PADDLE_W, h: PADDLE_H};
+    ball = {x: W/2, y: H - 40, dx: 2.5, dy: -2.5, r: BALL_R};
+    score = 0;
+    bestScore = parseInt(localStorage.getItem('breakoutBest') || '0');
+    document.getElementById('breakout-best').textContent = bestScore;
+    draw();
+  }
+
+  function draw() {
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, W, H);
+
+    bricks.forEach(b => {
+      if (!b.alive) return;
+      ctx.fillStyle = b.color;
+      ctx.shadowColor = b.color;
+      ctx.shadowBlur = 5;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+    });
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#4444aa';
+    ctx.shadowColor = '#4444ff';
+    ctx.shadowBlur = 8;
+    ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    document.getElementById('breakout-score').textContent = score;
+  }
+
+  function update() {
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    if (ball.x - ball.r <= 0 || ball.x + ball.r >= W) ball.dx *= -1;
+    if (ball.y - ball.r <= 0) ball.dy *= -1;
+
+    if (ball.y + ball.r >= paddle.y &&
+        ball.x >= paddle.x && ball.x <= paddle.x + paddle.w &&
+        ball.dy > 0) {
+      ball.dy *= -1;
+      const hit = (ball.x - paddle.x) / paddle.w - 0.5;
+      ball.dx = hit * 5;
+      ball.y = paddle.y - ball.r;
+    }
+
+    if (ball.y > H + 20) {
+      gameOver();
+      return;
+    }
+
+    bricks.forEach(b => {
+      if (!b.alive) return;
+      if (ball.x + ball.r > b.x && ball.x - ball.r < b.x + b.w &&
+          ball.y + ball.r > b.y && ball.y - ball.r < b.y + b.h) {
+        b.alive = false;
+        ball.dy *= -1;
+        score += 10;
+        if (score > bestScore) {
+          bestScore = score;
+          localStorage.setItem('breakoutBest', bestScore);
+          document.getElementById('breakout-best').textContent = bestScore;
+        }
+      }
+    });
+
+    if (bricks.every(b => !b.alive)) {
+      win();
+      return;
+    }
+
+    draw();
+    animId = requestAnimationFrame(update);
+  }
+
+  function gameOver() {
+    running = false;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ff0055';
+    ctx.font = '20px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', W/2, H/2 - 10);
+    ctx.fillStyle = '#ffaa00';
+    ctx.font = '14px Courier New';
+    ctx.fillText('Score: ' + score, W/2, H/2 + 15);
+  }
+
+  function win() {
+    running = false;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '20px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('YOU WIN!', W/2, H/2 - 10);
+    ctx.fillStyle = '#ffaa00';
+    ctx.font = '14px Courier New';
+    ctx.fillText('Score: ' + score, W/2, H/2 + 15);
+  }
+
+  function start() {
+    if (running) cancelAnimationFrame(animId);
+    running = true;
+    init();
+    animId = requestAnimationFrame(update);
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    if (!running) return;
+    const rect = canvas.getBoundingClientRect();
+    paddle.x = (e.clientX - rect.left) * (W / rect.width) - paddle.w / 2;
+    paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!running) return;
+    if (e.key === 'ArrowLeft') paddle.x = Math.max(0, paddle.x - 20);
+    if (e.key === 'ArrowRight') paddle.x = Math.min(W - paddle.w, paddle.x + 20);
+  });
+
+  init();
+  return { start };
+})();
+
+// ============== REACTION ==============
+const reactionGame = (() => {
+  const zone = document.getElementById('reaction-zone');
+  let state = 'idle';
+  let timeout;
+  let startTime;
+  let times = [];
+  let bestTime = parseInt(localStorage.getItem('reactionBest') || '0');
+
+  if (bestTime) document.getElementById('reaction-best').textContent = bestTime + 'ms';
+
+  function start() {
+    state = 'waiting';
+    zone.className = 'reaction-zone waiting';
+    zone.textContent = 'WAIT FOR GREEN...';
+    document.getElementById('reaction-time').textContent = '---';
+
+    clearTimeout(timeout);
+    const delay = 1500 + Math.random() * 4000;
+    timeout = setTimeout(() => {
+      state = 'ready';
+      zone.className = 'reaction-zone ready';
+      zone.textContent = 'CLICK NOW!';
+      startTime = performance.now();
+    }, delay);
+  }
+
+  function click() {
+    if (state === 'idle') return;
+
+    if (state === 'waiting') {
+      clearTimeout(timeout);
+      state = 'idle';
+      zone.className = 'reaction-zone too-early';
+      zone.textContent = 'TOO EARLY!';
+      document.getElementById('reaction-time').textContent = 'MISS';
+      return;
+    }
+
+    if (state === 'ready') {
+      const elapsed = Math.round(performance.now() - startTime);
+      state = 'idle';
+      zone.className = 'reaction-zone result';
+      zone.textContent = elapsed + ' ms';
+      document.getElementById('reaction-time').textContent = elapsed + 'ms';
+
+      times.push(elapsed);
+      if (times.length > 5) times.shift();
+
+      if (!bestTime || elapsed < bestTime) {
+        bestTime = elapsed;
+        localStorage.setItem('reactionBest', bestTime);
+        document.getElementById('reaction-best').textContent = bestTime + 'ms';
+      }
+
+      const hist = document.getElementById('reaction-history');
+      hist.textContent = 'LAST ' + times.length + ': ' + times.join(', ') + ' ms';
+    }
+  }
+
+  return { start, click };
+})();
+</script>
+
+</body>
+</html>
