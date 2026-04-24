@@ -12,6 +12,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "particle-life", "-l", "3457"],
       "port": 3457
+    },
+    {
+      "name": "fluid-dynamics",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "fluid-dynamics", "-l", "3458"],
+      "port": 3458
     }
   ]
 }
