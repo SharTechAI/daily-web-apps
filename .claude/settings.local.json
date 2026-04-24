@@ -18,7 +18,9 @@
       "mcp__Claude_in_Chrome__computer",
       "Bash(open -a \"Google Chrome\" \"https://github.com/login\")",
       "Bash(gh repo *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git commit *)"
     ]
   }
 }
