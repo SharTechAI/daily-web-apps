@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spirograph Generator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a12;
+    color: #e0e0f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  canvas {
+    flex: 1;
+    cursor: crosshair;
+  }
+
+  .panel {
+    width: 320px;
+    background: #12121c;
+    border-left: 1px solid #2a2a3a;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .panel h1 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel h1 span { font-size: 1.5rem; }
+
+  .section {
+    background: #1a1a28;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  .section-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #7a7a9c;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  .control {
+    margin-bottom: 12px;
+  }
+
+  .control:last-child { margin-bottom: 0; }
+
+  .control label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    margin-bottom: 6px;
+    color: #b0b0cc;
+  }
+
+  .control label .val {
+    color: #7c6ff7;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #2a2a3a;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #7c6ff7;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(124,111,247,0.4);
+  }
+
+  .color-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.active { border-color: #fff; }
+
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .preset-btn {
+    background: #22223a;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    color: #c0c0d8;
+    padding: 8px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    text-align: center;
+  }
+
+  .preset-btn:hover {
+    background: #2e2e4a;
+    border-color: #7c6ff7;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    background: #7c6ff7;
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    padding: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn:hover { background: #6a5ce0; }
+
+  .btn.secondary {
+    background: #22223a;
+    border: 1px solid #2a2a3a;
+    color: #c0c0d8;
+  }
+
+  .btn.secondary:hover { background: #2e2e4a; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    color: #b0b0cc;
+  }
+
+  .toggle {
+    width: 40px;
+    height: 22px;
+    background: #2a2a3a;
+    border-radius: 11px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.on { background: #7c6ff7; }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: left 0.2s;
+  }
+
+  .toggle.on::after { left: 20px; }
+
+  .mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: #22223a;
+    border-radius: 8px;
+    padding: 3px;
+  }
+
+  .mode-tab {
+    flex: 1;
+    text-align: center;
+    padding: 6px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #7a7a9c;
+    transition: background 0.2s, color 0.2s;
+    font-weight: 500;
+  }
+
+  .mode-tab.active {
+    background: #7c6ff7;
+    color: #fff;
+  }
+
+  .info-bar {
+    font-size: 0.72rem;
+    color: #5a5a7c;
+    text-align: center;
+    padding-top: 8px;
+    border-top: 1px solid #2a2a3a;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 768px) {
+    body { flex-direction: column-reverse; }
+    .panel {
+      width: 100%;
+      max-height: 45vh;
+      border-left: none;
+      border-top: 1px solid #2a2a3a;
+    }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="panel">
+  <h1><span>🌀</span> Spirograph</h1>
+
+  <div class="section">
+    <div class="section-title">Curve Type</div>
+    <div class="mode-tabs" id="curveType">
+      <div class="mode-tab active" data-value="hypo">Hypotrochoid</div>
+      <div class="mode-tab" data-value="epi">Epitrochoid</div>
+      <div class="mode-tab" data-value="rose">Rose</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Geometry</div>
+    <div class="control">
+      <label>Outer Radius (R) <span class="val" id="valR">200</span></label>
+      <input type="range" id="outerR" min="40" max="400" value="200" step="1">
+    </div>
+    <div class="control">
+      <label>Inner Radius (r) <span class="val" id="valr">75</span></label>
+      <input type="range" id="innerR" min="5" max="300" value="75" step="1">
+    </div>
+    <div class="control">
+      <label>Pen Offset (d) <span class="val" id="vald">60</span></label>
+      <input type="range" id="penD" min="1" max="300" value="60" step="1">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Appearance</div>
+    <div class="control">
+      <label>Line Width <span class="val" id="valLW">1.5</span></label>
+      <input type="range" id="lineWidth" min="0.3" max="6" value="1.5" step="0.1">
+    </div>
+    <div class="control">
+      <label>Speed <span class="val" id="valSpeed">2</span></label>
+      <input type="range" id="speed" min="0.5" max="10" value="2" step="0.5">
+    </div>
+    <div class="control">
+      <label>Layers <span class="val" id="valLayers">1</span></label>
+      <input type="range" id="layers" min="1" max="6" value="1" step="1">
+    </div>
+    <div class="control">
+      <label>Layer Rotation <span class="val" id="valRotOff">0°</span></label>
+      <input type="range" id="rotOffset" min="0" max="60" value="0" step="1">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Color Scheme</div>
+    <div class="color-row" id="colorSchemes"></div>
+    <div style="margin-top:10px">
+      <div class="toggle-row">
+        <span>Rainbow Cycle</span>
+        <div class="toggle" id="rainbowToggle"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Display</div>
+    <div class="toggle-row" style="margin-bottom:10px">
+      <span>Show Gears</span>
+      <div class="toggle on" id="gearsToggle"></div>
+    </div>
+    <div class="toggle-row" style="margin-bottom:10px">
+      <span>Glow Effect</span>
+      <div class="toggle on" id="glowToggle"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Fade Trail</span>
+      <div class="toggle" id="fadeToggle"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Presets</div>
+    <div class="preset-grid" id="presets"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn secondary" id="clearBtn">Clear</button>
+    <button class="btn secondary" id="pauseBtn">Pause</button>
+    <button class="btn" id="saveBtn">Save PNG</button>
+  </div>
+
+  <div class="info-bar">
+    Click canvas to recenter · Scroll to scale<br>
+    Tip: Try different R/r ratios for unique patterns
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const colorSchemes = [
+  { name: 'Neon',     colors: ['#7c6ff7','#5ee7b7','#ff6b9d','#ffd93d'] },
+  { name: 'Ocean',    colors: ['#00b4d8','#0077b6','#48cae4','#90e0ef'] },
+  { name: 'Sunset',   colors: ['#ff6b35','#f7c59f','#ff3864','#ffbe0b'] },
+  { name: 'Forest',   colors: ['#2d6a4f','#40916c','#52b788','#95d5b2'] },
+  { name: 'Vaporwave',colors: ['#ff71ce','#01cdfe','#05ffa1','#b967ff'] },
+  { name: 'Fire',     colors: ['#ff4500','#ff6347','#ffa500','#ffd700'] },
+  { name: 'Ice',      colors: ['#a8dadc','#457b9d','#1d3557','#e8f1f2'] },
+  { name: 'Candy',    colors: ['#f72585','#7209b7','#3a0ca3','#4cc9f0'] },
+];
+
+const presets = [
+  { name: '5-Petal Flower', R:200, r:40, d:40, type:'hypo' },
+  { name: 'Star Burst',     R:200, r:120, d:100, type:'hypo' },
+  { name: 'Spiraling Web',  R:300, r:197, d:180, type:'hypo' },
+  { name: 'Classic Rose',   R:200, r:75, d:75, type:'rose' },
+  { name: 'Epitrochoid 3',  R:100, r:33, d:60, type:'epi' },
+  { name: 'Nested Rings',   R:250, r:125, d:80, type:'hypo' },
+  { name: 'Tight Spiral',   R:200, r:199, d:150, type:'hypo' },
+  { name: 'Lace Pattern',   R:180, r:45, d:90, type:'hypo' },
+];
+
+let state = {
+  R: 200, r: 75, d: 60,
+  type: 'hypo',
+  lineWidth: 1.5,
+  speed: 2,
+  layers: 1,
+  rotOffset: 0,
+  colorIdx: 0,
+  rainbow: false,
+  showGears: true,
+  glow: true,
+  fade: false,
+  paused: false,
+  t: 0,
+  cx: 0, cy: 0,
+  points: [],
+  scale: 1,
+};
+
+function resize() {
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  state.cx = canvas.clientWidth / 2;
+  state.cy = canvas.clientHeight / 2;
+  redrawAll();
+}
+
+window.addEventListener('resize', resize);
+
+function gcd(a, b) {
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
+  while (b) { [a, b] = [b, a % b]; }
+  return a;
+}
+
+function lcm(a, b) {
+  return Math.abs(a * b) / gcd(a, b);
+}
+
+function getFullRotations() {
+  const r = Math.round(state.r);
+  const R = Math.round(state.R);
+  if (r === 0) return 1;
+  const periods = lcm(R, r) / r;
+  return Math.min(periods, 500);
+}
+
+function computePoint(t, layerAngle) {
+  const { R, r, d, type } = state;
+  let x, y;
+
+  if (type === 'hypo') {
+    x = (R - r) * Math.cos(t) + d * Math.cos(((R - r) / r) * t);
+    y = (R - r) * Math.sin(t) - d * Math.sin(((R - r) / r) * t);
+  } else if (type === 'epi') {
+    x = (R + r) * Math.cos(t) - d * Math.cos(((R + r) / r) * t);
+    y = (R + r) * Math.sin(t) - d * Math.sin(((R + r) / r) * t);
+  } else {
+    const k = R / r;
+    const radius = R * Math.cos(k * t);
+    x = radius * Math.cos(t);
+    y = radius * Math.sin(t);
+  }
+
+  if (layerAngle) {
+    const cos = Math.cos(layerAngle);
+    const sin = Math.sin(layerAngle);
+    const rx = x * cos - y * sin;
+    const ry = x * sin + y * cos;
+    return [rx, ry];
+  }
+  return [x, y];
+}
+
+function getColor(t, layerIdx) {
+  const scheme = colorSchemes[state.colorIdx];
+  if (state.rainbow) {
+    const hue = ((t * 30) + layerIdx * 60) % 360;
+    return `hsl(${hue}, 85%, 65%)`;
+  }
+  return scheme.colors[(layerIdx) % scheme.colors.length];
+}
+
+function drawGears(t) {
+  const { R, r, d, type, cx, cy, scale } = state;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+
+  // Outer circle
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(124,111,247,0.2)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Inner circle position
+  let icx, icy, penX, penY;
+  if (type === 'hypo') {
+    icx = (R - r) * Math.cos(t);
+    icy = (R - r) * Math.sin(t);
+  } else if (type === 'epi') {
+    icx = (R + r) * Math.cos(t);
+    icy = (R + r) * Math.sin(t);
+  } else {
+    icx = 0;
+    icy = 0;
+  }
+
+  // Inner circle
+  if (type !== 'rose') {
+    ctx.beginPath();
+    ctx.arc(icx, icy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(94,231,183,0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Pen point
+  const [px, py] = computePoint(t, 0);
+  ctx.beginPath();
+  ctx.arc(px, py, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#ff6b9d';
+  ctx.fill();
+
+  // Line from inner center to pen
+  ctx.beginPath();
+  ctx.moveTo(icx, icy);
+  ctx.lineTo(px, py);
+  ctx.strokeStyle = 'rgba(255,107,157,0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function redrawAll() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, w, h);
+
+  if (state.points.length < 2) return;
+
+  for (let layer = 0; layer < state.layers; layer++) {
+    const layerAngle = layer * (state.rotOffset * Math.PI / 180);
+    const color = getColor(state.t, layer);
+
+    ctx.save();
+    ctx.translate(state.cx, state.cy);
+    ctx.scale(state.scale, state.scale);
+
+    if (state.glow) {
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = color;
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = state.lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    for (let i = 0; i < state.points.length; i++) {
+      const [bx, by] = state.points[i];
+      let x = bx, y = by;
+      if (layerAngle) {
+        const cos = Math.cos(layerAngle);
+        const sin = Math.sin(layerAngle);
+        x = bx * cos - by * sin;
+        y = bx * sin + by * cos;
+      }
+
+      if (state.fade) {
+        const alpha = i / state.points.length;
+        ctx.globalAlpha = alpha * alpha;
+      }
+
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+let animId;
+const dt = 0.015;
+
+function animate() {
+  if (state.paused) {
+    animId = requestAnimationFrame(animate);
+    return;
+  }
+
+  const fullRot = getFullRotations();
+  const maxT = fullRot * 2 * Math.PI;
+
+  const steps = Math.max(1, Math.round(state.speed * 3));
+  for (let i = 0; i < steps; i++) {
+    if (state.t >= maxT) break;
+    state.t += dt;
+    const [x, y] = computePoint(state.t, 0);
+    state.points.push([x, y]);
+  }
+
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let layer = 0; layer < state.layers; layer++) {
+    const layerAngle = layer * (state.rotOffset * Math.PI / 180);
+    const color = getColor(state.t, layer);
+
+    ctx.save();
+    ctx.translate(state.cx, state.cy);
+    ctx.scale(state.scale, state.scale);
+
+    if (state.glow) {
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = color;
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = state.lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    for (let i = 0; i < state.points.length; i++) {
+      const [bx, by] = state.points[i];
+      let x = bx, y = by;
+      if (layerAngle) {
+        const cos = Math.cos(layerAngle);
+        const sin = Math.sin(layerAngle);
+        x = bx * cos - by * sin;
+        y = bx * sin + by * cos;
+      }
+
+      if (state.fade) {
+        if (i > 0) {
+          ctx.stroke();
+          ctx.beginPath();
+          const [px, py] = (() => {
+            let px2 = state.points[i-1][0], py2 = state.points[i-1][1];
+            if (layerAngle) {
+              const cos = Math.cos(layerAngle);
+              const sin = Math.sin(layerAngle);
+              px2 = state.points[i-1][0] * cos - state.points[i-1][1] * sin;
+              py2 = state.points[i-1][0] * sin + state.points[i-1][1] * cos;
+            }
+            return [px2, py2];
+          })();
+          ctx.moveTo(px, py);
+          ctx.globalAlpha = Math.pow(i / state.points.length, 2);
+        }
+        ctx.lineTo(x, y);
+      } else {
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  if (state.showGears && state.t < maxT) {
+    drawGears(state.t);
+  }
+
+  // Progress indicator
+  if (state.t < maxT) {
+    const progress = state.t / maxT;
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(20, h - 12, w - 40, 4);
+    ctx.fillStyle = '#7c6ff7';
+    ctx.fillRect(20, h - 12, (w - 40) * progress, 4);
+  }
+
+  animId = requestAnimationFrame(animate);
+}
+
+function resetDraw() {
+  state.t = 0;
+  state.points = [];
+}
+
+// UI Setup
+function setupColorSwatches() {
+  const container = document.getElementById('colorSchemes');
+  container.innerHTML = '';
+  colorSchemes.forEach((scheme, i) => {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (i === state.colorIdx ? ' active' : '');
+    swatch.style.background = `linear-gradient(135deg, ${scheme.colors[0]}, ${scheme.colors[1]})`;
+    swatch.title = scheme.name;
+    swatch.onclick = () => {
+      state.colorIdx = i;
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+    };
+    container.appendChild(swatch);
+  });
+}
+
+function setupPresets() {
+  const container = document.getElementById('presets');
+  container.innerHTML = '';
+  presets.forEach(p => {
+    const btn = document.createElement('div');
+    btn.className = 'preset-btn';
+    btn.textContent = p.name;
+    btn.onclick = () => {
+      state.R = p.R; state.r = p.r; state.d = p.d; state.type = p.type;
+      document.getElementById('outerR').value = p.R;
+      document.getElementById('innerR').value = p.r;
+      document.getElementById('penD').value = p.d;
+      document.getElementById('valR').textContent = p.R;
+      document.getElementById('valr').textContent = p.r;
+      document.getElementById('vald').textContent = p.d;
+      document.querySelectorAll('#curveType .mode-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.value === p.type);
+      });
+      resetDraw();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function bindSlider(id, valId, prop, formatter) {
+  const slider = document.getElementById(id);
+  const valEl = document.getElementById(valId);
+  slider.addEventListener('input', () => {
+    const v = parseFloat(slider.value);
+    state[prop] = v;
+    valEl.textContent = formatter ? formatter(v) : v;
+    if (['R','r','d','type'].includes(prop)) resetDraw();
+  });
+}
+
+function bindToggle(id, prop) {
+  const el = document.getElementById(id);
+  el.addEventListener('click', () => {
+    state[prop] = !state[prop];
+    el.classList.toggle('on', state[prop]);
+  });
+}
+
+bindSlider('outerR', 'valR', 'R');
+bindSlider('innerR', 'valr', 'r');
+bindSlider('penD', 'vald', 'd');
+bindSlider('lineWidth', 'valLW', 'lineWidth');
+bindSlider('speed', 'valSpeed', 'speed');
+bindSlider('layers', 'valLayers', 'layers');
+bindSlider('rotOffset', 'valRotOff', 'rotOffset', v => v + '°');
+
+bindToggle('rainbowToggle', 'rainbow');
+bindToggle('gearsToggle', 'showGears');
+bindToggle('glowToggle', 'glow');
+bindToggle('fadeToggle', 'fade');
+
+document.querySelectorAll('#curveType .mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#curveType .mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    state.type = tab.dataset.value;
+    resetDraw();
+  });
+});
+
+document.getElementById('clearBtn').addEventListener('click', resetDraw);
+
+document.getElementById('pauseBtn').addEventListener('click', () => {
+  state.paused = !state.paused;
+  document.getElementById('pauseBtn').textContent = state.paused ? 'Resume' : 'Pause';
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'spirograph.png';
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCanvas.width = canvas.width;
+  tempCanvas.height = canvas.height;
+  tempCtx.fillStyle = '#0a0a12';
+  tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+  tempCtx.drawImage(canvas, 0, 0);
+  link.href = tempCanvas.toDataURL('image/png');
+  link.click();
+});
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  state.cx = e.clientX - rect.left;
+  state.cy = e.clientY - rect.top;
+  resetDraw();
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.05 : 0.05;
+  state.scale = Math.max(0.2, Math.min(3, state.scale + delta));
+  if (state.paused || state.t >= getFullRotations() * 2 * Math.PI) {
+    redrawAll();
+  }
+}, { passive: false });
+
+setupColorSwatches();
+setupPresets();
+resize();
+animate();
+</script>
+</body>
+</html>

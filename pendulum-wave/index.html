@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pendulum Wave</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a12;
+  color: #e0e0f0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+}
+
+canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+.controls {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 100vh;
+  background: rgba(12, 12, 20, 0.92);
+  backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255,255,255,0.08);
+  padding: 24px 20px;
+  overflow-y: auto;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: transform 0.3s ease;
+}
+
+.controls.collapsed {
+  transform: translateX(280px);
+}
+
+.toggle-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  background: rgba(12, 12, 20, 0.85);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e0e0f0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: right 0.3s ease, background 0.2s;
+}
+
+.toggle-btn:hover { background: rgba(30, 30, 50, 0.9); }
+
+.controls:not(.collapsed) ~ .toggle-btn { right: 290px; }
+
+h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #7a7a9c;
+  font-weight: 600;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #aab;
+}
+
+label .label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+label .val {
+  color: #7c6ff7;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7c6ff7;
+  cursor: pointer;
+  border: 2px solid #0a0a12;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+button {
+  background: rgba(124, 111, 247, 0.12);
+  border: 1px solid rgba(124, 111, 247, 0.25);
+  color: #c4bfff;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+button:hover {
+  background: rgba(124, 111, 247, 0.25);
+  border-color: rgba(124, 111, 247, 0.5);
+}
+
+button.active {
+  background: rgba(124, 111, 247, 0.35);
+  border-color: #7c6ff7;
+  color: #fff;
+}
+
+.action-row {
+  display: flex;
+  gap: 6px;
+}
+
+.action-row button {
+  flex: 1;
+}
+
+button.primary {
+  background: rgba(94, 231, 183, 0.15);
+  border-color: rgba(94, 231, 183, 0.3);
+  color: #5ee7b7;
+}
+
+button.primary:hover {
+  background: rgba(94, 231, 183, 0.25);
+}
+
+button.danger {
+  background: rgba(255, 100, 100, 0.12);
+  border-color: rgba(255, 100, 100, 0.25);
+  color: #ff8888;
+}
+
+button.danger:hover {
+  background: rgba(255, 100, 100, 0.22);
+}
+
+.info {
+  font-size: 0.72rem;
+  color: #666;
+  line-height: 1.5;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.color-swatch:hover { transform: scale(1.1); }
+.color-swatch.active { border-color: #fff; }
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.stat {
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.stat .stat-val {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #7c6ff7;
+}
+
+.stat .stat-label {
+  font-size: 0.65rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #aab;
+  cursor: pointer;
+}
+
+.checkbox-row input[type="checkbox"] {
+  accent-color: #7c6ff7;
+  width: 14px;
+  height: 14px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="controls" id="controls">
+  <h2>Pendulum Wave</h2>
+
+  <div class="stats" id="stats">
+    <div class="stat">
+      <div class="stat-val" id="stat-time">0:00</div>
+      <div class="stat-label">Elapsed</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-cycle">0%</div>
+      <div class="stat-label">Cycle</div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-title">Configuration</div>
+    <label>
+      <div class="label-row"><span>Pendulums</span><span class="val" id="val-count">24</span></div>
+      <input type="range" id="count" min="5" max="60" value="24">
+    </label>
+    <label>
+      <div class="label-row"><span>Cycle Duration (s)</span><span class="val" id="val-cycle">60</span></div>
+      <input type="range" id="cycleDuration" min="15" max="120" value="60" step="5">
+    </label>
+    <label>
+      <div class="label-row"><span>Speed</span><span class="val" id="val-speed">1.0x</span></div>
+      <input type="range" id="speed" min="0.1" max="5" value="1" step="0.1">
+    </label>
+    <label>
+      <div class="label-row"><span>Base Frequency</span><span class="val" id="val-baseFreq">25</span></div>
+      <input type="range" id="baseFreq" min="10" max="60" value="25">
+    </label>
+    <label>
+      <div class="label-row"><span>Amplitude</span><span class="val" id="val-amplitude">30</span></div>
+      <input type="range" id="amplitude" min="5" max="60" value="30">
+    </label>
+    <label>
+      <div class="label-row"><span>Damping</span><span class="val" id="val-damping">0</span></div>
+      <input type="range" id="damping" min="0" max="0.02" value="0" step="0.001">
+    </label>
+    <label>
+      <div class="label-row"><span>Bob Size</span><span class="val" id="val-bobSize">12</span></div>
+      <input type="range" id="bobSize" min="4" max="30" value="12">
+    </label>
+  </div>
+
+  <div class="group">
+    <div class="group-title">Display</div>
+    <label class="checkbox-row">
+      <input type="checkbox" id="showStrings" checked> Show strings
+    </label>
+    <label class="checkbox-row">
+      <input type="checkbox" id="showTrails"> Show trails
+    </label>
+    <label class="checkbox-row">
+      <input type="checkbox" id="showShadow" checked> Show shadows
+    </label>
+    <label class="checkbox-row">
+      <input type="checkbox" id="showWave" checked> Show wave connector
+    </label>
+    <label>
+      <div class="label-row"><span>Trail Length</span><span class="val" id="val-trailLen">80</span></div>
+      <input type="range" id="trailLen" min="10" max="300" value="80">
+    </label>
+  </div>
+
+  <div class="group">
+    <div class="group-title">Color Scheme</div>
+    <div class="color-grid" id="colorGrid"></div>
+  </div>
+
+  <div class="group">
+    <div class="group-title">Presets</div>
+    <div class="preset-grid">
+      <button onclick="applyPreset('classic')">Classic</button>
+      <button onclick="applyPreset('dense')">Dense</button>
+      <button onclick="applyPreset('sparse')">Sparse</button>
+      <button onclick="applyPreset('fast')">Fast</button>
+      <button onclick="applyPreset('slow')">Slow Motion</button>
+      <button onclick="applyPreset('damped')">Damped</button>
+      <button onclick="applyPreset('chaos')">Chaotic</button>
+      <button onclick="applyPreset('minimal')">Minimal</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-title">Actions</div>
+    <div class="action-row">
+      <button class="primary" id="playPause" onclick="togglePlay()">Pause</button>
+      <button class="danger" onclick="resetSim()">Reset</button>
+    </div>
+  </div>
+
+  <div class="info">
+    Pendulums with slightly different lengths create mesmerizing wave patterns as they drift in and out of phase. The full pattern repeats after one cycle.
+  </div>
+</div>
+
+<button class="toggle-btn" id="toggleBtn" onclick="toggleControls()">☰</button>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const colorSchemes = [
+  { name: 'Spectrum', colors: i => `hsl(${(i / state.count) * 360}, 85%, 65%)`, bg: '#0a0a12', swatch: 'linear-gradient(135deg, #ff4466, #ffaa00, #44ff66, #4488ff, #aa44ff)' },
+  { name: 'Ocean', colors: i => `hsl(${180 + (i / state.count) * 60}, 80%, ${50 + (i / state.count) * 20}%)`, bg: '#060d14', swatch: 'linear-gradient(135deg, #0088aa, #00ccff, #44eeff)' },
+  { name: 'Sunset', colors: i => `hsl(${(i / state.count) * 60}, 90%, ${55 + (i / state.count) * 15}%)`, bg: '#120808', swatch: 'linear-gradient(135deg, #ff2244, #ff6600, #ffcc00)' },
+  { name: 'Neon', colors: i => { const h = [300, 180, 120, 60, 0]; return `hsl(${h[i % 5]}, 100%, 60%)`; }, bg: '#08080e', swatch: 'linear-gradient(135deg, #ff00ff, #00ffff, #00ff88)' },
+  { name: 'Ice', colors: i => `hsl(${200 + (i / state.count) * 40}, 60%, ${65 + (i / state.count) * 20}%)`, bg: '#0a0e14', swatch: 'linear-gradient(135deg, #6688cc, #88bbee, #ccddff)' },
+  { name: 'Fire', colors: i => `hsl(${(i / state.count) * 40}, 100%, ${45 + (i / state.count) * 20}%)`, bg: '#120a04', swatch: 'linear-gradient(135deg, #cc2200, #ff6600, #ffcc00)' },
+  { name: 'Mono', colors: () => '#e0e0f0', bg: '#0a0a12', swatch: 'linear-gradient(135deg, #888, #ccc, #fff)' },
+  { name: 'Emerald', colors: i => `hsl(${140 + (i / state.count) * 40}, 70%, ${45 + (i / state.count) * 25}%)`, bg: '#06100a', swatch: 'linear-gradient(135deg, #228855, #44cc77, #88eebb)' },
+];
+
+const state = {
+  count: 24,
+  cycleDuration: 60,
+  speed: 1,
+  baseFreq: 25,
+  amplitude: 30,
+  damping: 0,
+  bobSize: 12,
+  showStrings: true,
+  showTrails: false,
+  showShadow: true,
+  showWave: true,
+  trailLen: 80,
+  colorScheme: 0,
+  playing: true,
+  time: 0,
+};
+
+let trails = [];
+let lastFrame = 0;
+
+function resize() {
+  const controlsEl = document.getElementById('controls');
+  const panelWidth = controlsEl.classList.contains('collapsed') ? 0 : 280;
+  canvas.width = window.innerWidth - panelWidth;
+  canvas.height = window.innerHeight;
+}
+
+window.addEventListener('resize', resize);
+
+function toggleControls() {
+  document.getElementById('controls').classList.toggle('collapsed');
+  setTimeout(resize, 310);
+}
+
+function togglePlay() {
+  state.playing = !state.playing;
+  document.getElementById('playPause').textContent = state.playing ? 'Pause' : 'Play';
+}
+
+function resetSim() {
+  state.time = 0;
+  trails = [];
+}
+
+function initTrails() {
+  trails = [];
+  for (let i = 0; i < state.count; i++) {
+    trails.push([]);
+  }
+}
+
+function getFrequency(i) {
+  return state.baseFreq + i;
+}
+
+function getPendulumLength(i, totalHeight) {
+  const freq = getFrequency(i);
+  const g = 9.81;
+  const T = state.cycleDuration / freq;
+  const L = g * T * T / (4 * Math.PI * Math.PI);
+  const maxL = totalHeight * 0.8;
+  const minL = totalHeight * 0.15;
+  const ratio = (i) / (state.count - 1);
+  return minL + ratio * (maxL - minL);
+}
+
+function applyPreset(name) {
+  const presets = {
+    classic: { count: 24, cycleDuration: 60, speed: 1, baseFreq: 25, amplitude: 30, damping: 0, bobSize: 12, showTrails: false, showWave: true, showStrings: true, showShadow: true },
+    dense: { count: 48, cycleDuration: 60, speed: 1, baseFreq: 25, amplitude: 20, damping: 0, bobSize: 8, showTrails: false, showWave: true, showStrings: true, showShadow: true },
+    sparse: { count: 12, cycleDuration: 60, speed: 1, baseFreq: 25, amplitude: 40, damping: 0, bobSize: 18, showTrails: false, showWave: true, showStrings: true, showShadow: true },
+    fast: { count: 24, cycleDuration: 30, speed: 2.5, baseFreq: 25, amplitude: 30, damping: 0, bobSize: 12, showTrails: true, showWave: true, showStrings: false, showShadow: false },
+    slow: { count: 24, cycleDuration: 90, speed: 0.4, baseFreq: 25, amplitude: 35, damping: 0, bobSize: 14, showTrails: false, showWave: true, showStrings: true, showShadow: true },
+    damped: { count: 24, cycleDuration: 60, speed: 1, baseFreq: 25, amplitude: 45, damping: 0.008, bobSize: 12, showTrails: true, showWave: true, showStrings: true, showShadow: true },
+    chaos: { count: 36, cycleDuration: 30, speed: 3, baseFreq: 40, amplitude: 35, damping: 0, bobSize: 10, showTrails: true, showWave: false, showStrings: false, showShadow: false },
+    minimal: { count: 16, cycleDuration: 60, speed: 1, baseFreq: 25, amplitude: 25, damping: 0, bobSize: 10, showTrails: false, showWave: false, showStrings: true, showShadow: false },
+  };
+  const p = presets[name];
+  if (!p) return;
+  Object.assign(state, p);
+  syncUI();
+  initTrails();
+}
+
+function syncUI() {
+  const ids = ['count', 'cycleDuration', 'speed', 'baseFreq', 'amplitude', 'damping', 'bobSize', 'trailLen'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = state[id];
+  });
+  document.getElementById('showStrings').checked = state.showStrings;
+  document.getElementById('showTrails').checked = state.showTrails;
+  document.getElementById('showShadow').checked = state.showShadow;
+  document.getElementById('showWave').checked = state.showWave;
+  updateLabels();
+}
+
+function updateLabels() {
+  document.getElementById('val-count').textContent = state.count;
+  document.getElementById('val-cycle').textContent = state.cycleDuration;
+  document.getElementById('val-speed').textContent = state.speed.toFixed(1) + 'x';
+  document.getElementById('val-baseFreq').textContent = state.baseFreq;
+  document.getElementById('val-amplitude').textContent = state.amplitude;
+  document.getElementById('val-damping').textContent = state.damping.toFixed(3);
+  document.getElementById('val-bobSize').textContent = state.bobSize;
+  document.getElementById('val-trailLen').textContent = state.trailLen;
+}
+
+function setupControls() {
+  const rangeInputs = ['count', 'cycleDuration', 'speed', 'baseFreq', 'amplitude', 'damping', 'bobSize', 'trailLen'];
+  rangeInputs.forEach(id => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      state[id] = parseFloat(e.target.value);
+      if (id === 'count') initTrails();
+      updateLabels();
+    });
+  });
+
+  ['showStrings', 'showTrails', 'showShadow', 'showWave'].forEach(id => {
+    document.getElementById(id).addEventListener('change', (e) => {
+      state[id] = e.target.checked;
+    });
+  });
+
+  const colorGrid = document.getElementById('colorGrid');
+  colorSchemes.forEach((scheme, i) => {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (i === 0 ? ' active' : '');
+    swatch.style.background = scheme.swatch;
+    swatch.title = scheme.name;
+    swatch.addEventListener('click', () => {
+      state.colorScheme = i;
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+    });
+    colorGrid.appendChild(swatch);
+  });
+}
+
+function draw(timestamp) {
+  requestAnimationFrame(draw);
+
+  if (!lastFrame) lastFrame = timestamp;
+  const dt = (timestamp - lastFrame) / 1000;
+  lastFrame = timestamp;
+
+  if (state.playing) {
+    state.time += dt * state.speed;
+  }
+
+  const scheme = colorSchemes[state.colorScheme];
+  const W = canvas.width;
+  const H = canvas.height;
+
+  ctx.fillStyle = scheme.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const anchorY = 40;
+  const margin = 60;
+  const spacing = (W - margin * 2) / (state.count - 1);
+  const maxSwing = (state.amplitude / 100) * Math.min(spacing * 2.5, H * 0.35);
+
+  const pendulums = [];
+
+  for (let i = 0; i < state.count; i++) {
+    const freq = getFrequency(i);
+    const omega = (2 * Math.PI * freq) / state.cycleDuration;
+    const dampFactor = Math.exp(-state.damping * state.time);
+    const angle = maxSwing * dampFactor * Math.sin(omega * state.time);
+
+    const anchorX = margin + i * spacing;
+    const length = getPendulumLength(i, H - anchorY - 60);
+    const bobX = anchorX + angle;
+    const bobY = anchorY + Math.sqrt(Math.max(0, length * length - angle * angle));
+
+    pendulums.push({ anchorX, bobX, bobY, angle, length, i });
+
+    if (state.showTrails && trails[i]) {
+      trails[i].push({ x: bobX, y: bobY });
+      if (trails[i].length > state.trailLen) {
+        trails[i].shift();
+      }
+    }
+  }
+
+  // Draw trails
+  if (state.showTrails) {
+    for (let i = 0; i < state.count; i++) {
+      if (!trails[i] || trails[i].length < 2) continue;
+      const color = scheme.colors(i);
+      ctx.beginPath();
+      ctx.moveTo(trails[i][0].x, trails[i][0].y);
+      for (let j = 1; j < trails[i].length; j++) {
+        ctx.lineTo(trails[i][j].x, trails[i][j].y);
+      }
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Draw shadows
+  if (state.showShadow) {
+    for (const p of pendulums) {
+      const color = scheme.colors(p.i);
+      const shadowY = H - 30;
+      ctx.beginPath();
+      ctx.ellipse(p.bobX, shadowY, state.bobSize * 0.8, state.bobSize * 0.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.1;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Draw wave connector
+  if (state.showWave && pendulums.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(pendulums[0].bobX, pendulums[0].bobY);
+    for (let i = 1; i < pendulums.length; i++) {
+      const prev = pendulums[i - 1];
+      const curr = pendulums[i];
+      const cpX = (prev.bobX + curr.bobX) / 2;
+      const cpY = (prev.bobY + curr.bobY) / 2;
+      ctx.quadraticCurveTo(prev.bobX, prev.bobY, cpX, cpY);
+    }
+    const last = pendulums[pendulums.length - 1];
+    ctx.lineTo(last.bobX, last.bobY);
+    ctx.strokeStyle = 'rgba(124, 111, 247, 0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Draw bar at top
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillRect(margin - 20, anchorY - 6, W - margin * 2 + 40, 12);
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(margin - 20, anchorY - 6, W - margin * 2 + 40, 12);
+
+  // Draw strings and bobs
+  for (const p of pendulums) {
+    const color = scheme.colors(p.i);
+
+    if (state.showStrings) {
+      ctx.beginPath();
+      ctx.moveTo(p.anchorX, anchorY);
+      ctx.lineTo(p.bobX, p.bobY);
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Bob glow
+    const gradient = ctx.createRadialGradient(p.bobX, p.bobY, 0, p.bobX, p.bobY, state.bobSize * 2.5);
+    gradient.addColorStop(0, color.replace(')', ', 0.2)').replace('hsl', 'hsla').replace('rgb', 'rgba'));
+    gradient.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(p.bobX, p.bobY, state.bobSize * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Bob
+    ctx.beginPath();
+    ctx.arc(p.bobX, p.bobY, state.bobSize, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Bob highlight
+    ctx.beginPath();
+    ctx.arc(p.bobX - state.bobSize * 0.3, p.bobY - state.bobSize * 0.3, state.bobSize * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
+  }
+
+  // Update stats
+  const minutes = Math.floor(state.time / 60);
+  const seconds = Math.floor(state.time % 60);
+  document.getElementById('stat-time').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const cycleProgress = ((state.time % state.cycleDuration) / state.cycleDuration * 100);
+  document.getElementById('stat-cycle').textContent = cycleProgress.toFixed(0) + '%';
+}
+
+function init() {
+  resize();
+  setupControls();
+  initTrails();
+  updateLabels();
+  requestAnimationFrame(draw);
+}
+
+init();
+</script>
+</body>
+</html>

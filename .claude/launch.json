@@ -24,6 +24,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "fractal-explorer", "-l", "3459"],
       "port": 3459
+    },
+    {
+      "name": "spirograph-generator",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "spirograph-generator", "-l", "3460"],
+      "port": 3460
     }
   ]
 }
