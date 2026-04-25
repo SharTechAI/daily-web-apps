@@ -314,8 +314,20 @@ export default {
       });
     }
 
+    // Any path not under /apps is also proxied to GitHub Pages
+    // e.g. /fluid-dynamics/index.html → shartechai.github.io/daily-web-apps/fluid-dynamics/index.html
     if (!url.pathname.startsWith('/apps')) {
-      return fetch(request);
+      const targetURL = `https://shartechai.github.io/daily-web-apps${url.pathname}${url.search}`;
+      return fetch(new Request(targetURL, {
+        method: request.method,
+        headers: (() => {
+          const h = new Headers(request.headers);
+          h.set('Host', 'shartechai.github.io');
+          return h;
+        })(),
+        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : null,
+        redirect: 'follow',
+      }));
     }
 
     // /apps        → /daily-web-apps/
