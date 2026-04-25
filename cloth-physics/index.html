@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloth Physics Simulator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a12;
+    color: #e0e0f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    background: rgba(16, 16, 26, 0.95);
+    border-bottom: 1px solid #2a2a3a;
+    flex-wrap: wrap;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+  }
+
+  .toolbar h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-right: 8px;
+    white-space: nowrap;
+  }
+
+  .toolbar h1 span {
+    background: linear-gradient(135deg, #7c6ff7, #5ee7b7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .sep { width: 1px; height: 24px; background: #2a2a3a; flex-shrink: 0; }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .control-group label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #7a7a8c;
+    white-space: nowrap;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 80px;
+    height: 4px;
+    background: #2a2a3a;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #7c6ff7;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid #2a2a3a;
+    background: #1a1a28;
+    color: #c0c0d0;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: #2a2a3a; border-color: #7c6ff7; color: #fff; }
+
+  .btn.active {
+    background: #7c6ff7;
+    border-color: #7c6ff7;
+    color: #fff;
+  }
+
+  .tool-btns { display: flex; gap: 4px; }
+
+  .tool-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #2a2a3a;
+    background: #1a1a28;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .tool-btn:hover { background: #2a2a3a; border-color: #7c6ff7; }
+  .tool-btn.active { background: #7c6ff7; border-color: #7c6ff7; }
+
+  .tool-btn[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 6px;
+    background: #1a1a28;
+    border: 1px solid #2a2a3a;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    z-index: 100;
+    color: #c0c0d0;
+  }
+
+  .tool-btn { position: relative; }
+
+  select {
+    padding: 5px 8px;
+    border: 1px solid #2a2a3a;
+    background: #1a1a28;
+    color: #c0c0d0;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    outline: none;
+  }
+
+  select:hover { border-color: #7c6ff7; }
+
+  canvas {
+    flex: 1;
+    display: block;
+    cursor: default;
+  }
+
+  .info-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 20px;
+    background: rgba(16, 16, 26, 0.95);
+    border-top: 1px solid #2a2a3a;
+    font-size: 0.72rem;
+    color: #5a5a6c;
+  }
+
+  .info-bar span { margin-right: 16px; }
+  .info-bar a { color: #7c6ff7; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>🧵 <span>Cloth Physics</span></h1>
+  <div class="sep"></div>
+
+  <div class="control-group">
+    <label>Tool</label>
+    <div class="tool-btns">
+      <button class="tool-btn active" data-tool="drag" title="Drag">✋</button>
+      <button class="tool-btn" data-tool="tear" title="Tear">✂️</button>
+      <button class="tool-btn" data-tool="pin" title="Pin / Unpin">📌</button>
+      <button class="tool-btn" data-tool="burn" title="Burn">🔥</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+
+  <div class="control-group">
+    <label>Gravity</label>
+    <input type="range" id="gravity" min="0" max="2" step="0.05" value="0.5">
+  </div>
+
+  <div class="control-group">
+    <label>Wind</label>
+    <input type="range" id="wind" min="-1.5" max="1.5" step="0.05" value="0">
+  </div>
+
+  <div class="control-group">
+    <label>Stiffness</label>
+    <input type="range" id="stiffness" min="1" max="20" step="1" value="10">
+  </div>
+
+  <div class="control-group">
+    <label>Brush</label>
+    <input type="range" id="brushSize" min="10" max="100" step="5" value="40">
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="control-group">
+    <label>Color</label>
+    <select id="colorScheme">
+      <option value="gradient">Gradient</option>
+      <option value="stress">Stress Map</option>
+      <option value="velocity">Velocity</option>
+      <option value="silk">Silk</option>
+      <option value="denim">Denim</option>
+      <option value="neon">Neon</option>
+      <option value="sunset">Sunset</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <label>Preset</label>
+    <select id="preset">
+      <option value="curtain">Curtain</option>
+      <option value="flag">Flag</option>
+      <option value="hammock">Hammock</option>
+      <option value="cape">Cape</option>
+      <option value="net">Net</option>
+    </select>
+  </div>
+
+  <button class="btn" id="resetBtn">Reset</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="info-bar">
+  <div>
+    <span id="fps">60 FPS</span>
+    <span id="particleCount">Particles: 0</span>
+    <span id="constraintCount">Constraints: 0</span>
+  </div>
+  <div>
+    Left-click: use tool · Scroll: brush size · <a href="../index.html">← Gallery</a>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = canvas.clientWidth * devicePixelRatio;
+  H = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+resize();
+window.addEventListener('resize', () => { resize(); initCloth(); });
+
+const gravitySlider = document.getElementById('gravity');
+const windSlider = document.getElementById('wind');
+const stiffnessSlider = document.getElementById('stiffness');
+const brushSlider = document.getElementById('brushSize');
+const colorSelect = document.getElementById('colorScheme');
+const presetSelect = document.getElementById('preset');
+const resetBtn = document.getElementById('resetBtn');
+const fpsEl = document.getElementById('fps');
+const particleCountEl = document.getElementById('particleCount');
+const constraintCountEl = document.getElementById('constraintCount');
+
+let currentTool = 'drag';
+let brushSize = 40;
+let mouseX = 0, mouseY = 0;
+let pmouseX = 0, pmouseY = 0;
+let mouseDown = false;
+let selectedPoint = null;
+
+const toolBtns = document.querySelectorAll('.tool-btn');
+toolBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    toolBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTool = btn.dataset.tool;
+    canvas.style.cursor = currentTool === 'drag' ? 'grab' :
+                           currentTool === 'tear' ? 'crosshair' :
+                           currentTool === 'pin' ? 'pointer' :
+                           'pointer';
+  });
+});
+
+brushSlider.addEventListener('input', () => { brushSize = parseFloat(brushSlider.value); });
+
+class Point {
+  constructor(x, y, pinned = false) {
+    this.x = x;
+    this.y = y;
+    this.ox = x;
+    this.oy = y;
+    this.pinned = pinned;
+    this.mass = 1;
+    this.burning = false;
+    this.burnTimer = 0;
+    this.removed = false;
+  }
+
+  update(gravity, wind, damping) {
+    if (this.pinned || this.removed) return;
+
+    if (this.burning) {
+      this.burnTimer++;
+      if (this.burnTimer > 30) {
+        this.removed = true;
+        return;
+      }
+    }
+
+    const vx = (this.x - this.ox) * damping;
+    const vy = (this.y - this.oy) * damping;
+
+    const windForce = wind * (0.8 + 0.4 * Math.sin(Date.now() * 0.003 + this.x * 0.01));
+    const gustY = wind * 0.3 * Math.sin(Date.now() * 0.005 + this.y * 0.02);
+
+    this.ox = this.x;
+    this.oy = this.y;
+    this.x += vx + windForce;
+    this.y += vy + gravity + gustY;
+
+    const w = W / devicePixelRatio;
+    const h = H / devicePixelRatio;
+    const margin = 2;
+
+    if (this.x < margin) { this.x = margin; }
+    if (this.x > w - margin) { this.x = w - margin; }
+    if (this.y < margin) { this.y = margin; }
+    if (this.y > h - margin) { this.y = h - margin; this.ox = this.x; }
+  }
+}
+
+class Constraint {
+  constructor(p1, p2, restLength) {
+    this.p1 = p1;
+    this.p2 = p2;
+    this.restLength = restLength || this.length();
+    this.active = true;
+    this.stress = 0;
+  }
+
+  length() {
+    const dx = this.p2.x - this.p1.x;
+    const dy = this.p2.y - this.p1.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  solve() {
+    if (!this.active || this.p1.removed || this.p2.removed) {
+      this.active = false;
+      return;
+    }
+
+    if (this.p1.burning && !this.p2.burning && Math.random() < 0.08) {
+      this.p2.burning = true;
+    }
+    if (this.p2.burning && !this.p1.burning && Math.random() < 0.08) {
+      this.p1.burning = true;
+    }
+
+    const dx = this.p2.x - this.p1.x;
+    const dy = this.p2.y - this.p1.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < 0.001) return;
+
+    this.stress = Math.abs(dist - this.restLength) / this.restLength;
+
+    if (dist > this.restLength * 2.2) {
+      this.active = false;
+      return;
+    }
+
+    const diff = (this.restLength - dist) / dist * 0.5;
+    const offsetX = dx * diff;
+    const offsetY = dy * diff;
+
+    if (!this.p1.pinned) {
+      this.p1.x -= offsetX;
+      this.p1.y -= offsetY;
+    }
+    if (!this.p2.pinned) {
+      this.p2.x += offsetX;
+      this.p2.y += offsetY;
+    }
+  }
+}
+
+let points = [];
+let constraints = [];
+let clothCols, clothRows, spacing;
+
+function initCloth() {
+  points = [];
+  constraints = [];
+
+  const w = W / devicePixelRatio;
+  const h = H / devicePixelRatio;
+  const preset = presetSelect.value;
+
+  if (preset === 'curtain') {
+    spacing = Math.max(6, Math.min(10, w / 80));
+    clothCols = Math.floor((w * 0.7) / spacing);
+    clothRows = Math.floor((h * 0.6) / spacing);
+    const startX = (w - clothCols * spacing) / 2;
+    const startY = 40;
+
+    for (let r = 0; r < clothRows; r++) {
+      for (let c = 0; c < clothCols; c++) {
+        const pinned = r === 0 && c % 4 === 0;
+        points.push(new Point(startX + c * spacing, startY + r * spacing, pinned));
+      }
+    }
+  } else if (preset === 'flag') {
+    spacing = Math.max(6, Math.min(10, w / 70));
+    clothCols = Math.floor((w * 0.5) / spacing);
+    clothRows = Math.floor((h * 0.35) / spacing);
+    const startX = w * 0.15;
+    const startY = h * 0.2;
+
+    for (let r = 0; r < clothRows; r++) {
+      for (let c = 0; c < clothCols; c++) {
+        const pinned = c === 0;
+        points.push(new Point(startX + c * spacing, startY + r * spacing, pinned));
+      }
+    }
+  } else if (preset === 'hammock') {
+    spacing = Math.max(6, Math.min(10, w / 70));
+    clothCols = Math.floor((w * 0.55) / spacing);
+    clothRows = Math.floor((h * 0.25) / spacing);
+    const startX = (w - clothCols * spacing) / 2;
+    const startY = h * 0.15;
+
+    for (let r = 0; r < clothRows; r++) {
+      for (let c = 0; c < clothCols; c++) {
+        const pinned = (r === 0 && c === 0) || (r === 0 && c === clothCols - 1);
+        points.push(new Point(startX + c * spacing, startY + r * spacing, pinned));
+      }
+    }
+  } else if (preset === 'cape') {
+    spacing = Math.max(6, Math.min(10, w / 60));
+    clothCols = Math.floor((w * 0.4) / spacing);
+    clothRows = Math.floor((h * 0.6) / spacing);
+    const startX = (w - clothCols * spacing) / 2;
+    const startY = 30;
+
+    for (let r = 0; r < clothRows; r++) {
+      for (let c = 0; c < clothCols; c++) {
+        const pinned = r === 0 && c >= Math.floor(clothCols * 0.3) && c <= Math.floor(clothCols * 0.7);
+        points.push(new Point(startX + c * spacing, startY + r * spacing, pinned));
+      }
+    }
+  } else if (preset === 'net') {
+    spacing = Math.max(10, Math.min(18, w / 40));
+    clothCols = Math.floor((w * 0.6) / spacing);
+    clothRows = Math.floor((h * 0.5) / spacing);
+    const startX = (w - clothCols * spacing) / 2;
+    const startY = 40;
+
+    for (let r = 0; r < clothRows; r++) {
+      for (let c = 0; c < clothCols; c++) {
+        const pinned = r === 0 && c % 3 === 0;
+        points.push(new Point(startX + c * spacing, startY + r * spacing, pinned));
+      }
+    }
+  }
+
+  for (let r = 0; r < clothRows; r++) {
+    for (let c = 0; c < clothCols; c++) {
+      const idx = r * clothCols + c;
+      if (c < clothCols - 1) {
+        constraints.push(new Constraint(points[idx], points[idx + 1]));
+      }
+      if (r < clothRows - 1) {
+        constraints.push(new Constraint(points[idx], points[idx + clothCols]));
+      }
+    }
+  }
+
+  particleCountEl.textContent = `Particles: ${points.length}`;
+  constraintCountEl.textContent = `Constraints: ${constraints.length}`;
+}
+
+function getColorForConstraint(c, scheme) {
+  const p1 = c.p1, p2 = c.p2;
+  const mx = (p1.x + p2.x) / 2;
+  const my = (p1.y + p2.y) / 2;
+  const w = W / devicePixelRatio;
+  const h = H / devicePixelRatio;
+
+  if (p1.burning || p2.burning) {
+    const t = Math.max(p1.burnTimer || 0, p2.burnTimer || 0) / 30;
+    const r = 255;
+    const g = Math.floor(200 * (1 - t));
+    const b = 0;
+    return `rgba(${r},${g},${b},${1 - t * 0.7})`;
+  }
+
+  switch (scheme) {
+    case 'gradient': {
+      const t = my / h;
+      const r = Math.floor(124 + 130 * t);
+      const g = Math.floor(111 - 40 * t);
+      const b = Math.floor(247 - 100 * t);
+      return `rgba(${r},${g},${b},0.85)`;
+    }
+    case 'stress': {
+      const s = Math.min(c.stress * 5, 1);
+      const r = Math.floor(50 + 205 * s);
+      const g = Math.floor(200 * (1 - s));
+      const b = Math.floor(100 * (1 - s));
+      return `rgba(${r},${g},${b},0.85)`;
+    }
+    case 'velocity': {
+      const v1 = Math.sqrt((p1.x - p1.ox) ** 2 + (p1.y - p1.oy) ** 2);
+      const v2 = Math.sqrt((p2.x - p2.ox) ** 2 + (p2.y - p2.oy) ** 2);
+      const v = Math.min((v1 + v2) * 2, 1);
+      return `rgba(${Math.floor(94 + 161 * v)},${Math.floor(231 * (1 - v * 0.5))},${Math.floor(183 - 100 * v)},0.85)`;
+    }
+    case 'silk': {
+      const t = my / h;
+      const shine = 0.7 + 0.3 * Math.sin(mx * 0.05 + my * 0.03);
+      const r = Math.floor(200 * shine);
+      const g = Math.floor((180 + 40 * t) * shine);
+      const b = Math.floor((220 + 35 * (1 - t)) * shine);
+      return `rgba(${r},${g},${b},0.8)`;
+    }
+    case 'denim': {
+      const noise = 0.7 + 0.3 * Math.sin(mx * 0.3 + my * 0.2);
+      const r = Math.floor(50 * noise);
+      const g = Math.floor(80 * noise);
+      const b = Math.floor(160 * noise);
+      return `rgba(${r},${g},${b},0.9)`;
+    }
+    case 'neon': {
+      const t = (Math.sin(mx * 0.02 + Date.now() * 0.002) + 1) / 2;
+      const r = Math.floor(255 * t);
+      const g = Math.floor(100 + 155 * (1 - t));
+      const b = Math.floor(255 * (1 - t));
+      return `rgba(${r},${g},${b},0.9)`;
+    }
+    case 'sunset': {
+      const t = my / h;
+      const r = Math.floor(255 - 50 * t);
+      const g = Math.floor(120 - 80 * t);
+      const b = Math.floor(80 + 100 * t);
+      return `rgba(${r},${g},${b},0.85)`;
+    }
+    default:
+      return 'rgba(124,111,247,0.85)';
+  }
+}
+
+function drawCloth() {
+  const scheme = colorSelect.value;
+  const isNet = presetSelect.value === 'net';
+  const lineW = isNet ? 2.5 : 1.2;
+
+  ctx.lineWidth = lineW;
+
+  for (const c of constraints) {
+    if (!c.active || c.p1.removed || c.p2.removed) continue;
+
+    ctx.strokeStyle = getColorForConstraint(c, scheme);
+    ctx.beginPath();
+    ctx.moveTo(c.p1.x, c.p1.y);
+    ctx.lineTo(c.p2.x, c.p2.y);
+    ctx.stroke();
+  }
+
+  for (const p of points) {
+    if (p.removed) continue;
+
+    if (p.pinned) {
+      ctx.fillStyle = '#5ee7b7';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (p.burning) {
+      const t = p.burnTimer / 30;
+      const radius = 4 + 6 * (1 - t);
+      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
+      gradient.addColorStop(0, `rgba(255,200,50,${0.9 - t * 0.5})`);
+      gradient.addColorStop(0.5, `rgba(255,100,0,${0.6 - t * 0.3})`);
+      gradient.addColorStop(1, `rgba(200,0,0,0)`);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawBrushPreview() {
+  if (currentTool === 'drag' || !mouseDown) return;
+  ctx.strokeStyle = 'rgba(124,111,247,0.3)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.arc(mouseX, mouseY, brushSize, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  mouseDown = true;
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+  pmouseX = mouseX;
+  pmouseY = mouseY;
+
+  if (currentTool === 'drag') {
+    let closest = null;
+    let closestDist = Infinity;
+    for (const p of points) {
+      if (p.removed) continue;
+      const dx = p.x - mouseX;
+      const dy = p.y - mouseY;
+      const d = dx * dx + dy * dy;
+      if (d < closestDist && d < brushSize * brushSize) {
+        closestDist = d;
+        closest = p;
+      }
+    }
+    selectedPoint = closest;
+    canvas.style.cursor = 'grabbing';
+  } else if (currentTool === 'pin') {
+    for (const p of points) {
+      if (p.removed) continue;
+      const dx = p.x - mouseX;
+      const dy = p.y - mouseY;
+      if (dx * dx + dy * dy < brushSize * brushSize) {
+        p.pinned = !p.pinned;
+      }
+    }
+  } else {
+    applyTool();
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  pmouseX = mouseX;
+  pmouseY = mouseY;
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+
+  if (mouseDown && currentTool === 'drag' && selectedPoint) {
+    if (!selectedPoint.pinned) {
+      selectedPoint.x = mouseX;
+      selectedPoint.y = mouseY;
+    }
+  } else if (mouseDown && (currentTool === 'tear' || currentTool === 'burn')) {
+    applyTool();
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  mouseDown = false;
+  selectedPoint = null;
+  if (currentTool === 'drag') canvas.style.cursor = 'grab';
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouseDown = false;
+  selectedPoint = null;
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  brushSize = Math.max(10, Math.min(100, brushSize - e.deltaY * 0.1));
+  brushSlider.value = brushSize;
+}, { passive: false });
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  mouseX = t.clientX - rect.left;
+  mouseY = t.clientY - rect.top;
+  pmouseX = mouseX;
+  pmouseY = mouseY;
+  mouseDown = true;
+
+  if (currentTool === 'drag') {
+    let closest = null;
+    let closestDist = Infinity;
+    for (const p of points) {
+      if (p.removed) continue;
+      const dx = p.x - mouseX;
+      const dy = p.y - mouseY;
+      const d = dx * dx + dy * dy;
+      if (d < closestDist && d < brushSize * brushSize) {
+        closestDist = d;
+        closest = p;
+      }
+    }
+    selectedPoint = closest;
+  } else if (currentTool === 'pin') {
+    for (const p of points) {
+      if (p.removed) continue;
+      const dx = p.x - mouseX;
+      const dy = p.y - mouseY;
+      if (dx * dx + dy * dy < brushSize * brushSize) {
+        p.pinned = !p.pinned;
+      }
+    }
+  } else {
+    applyTool();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  pmouseX = mouseX;
+  pmouseY = mouseY;
+  mouseX = t.clientX - rect.left;
+  mouseY = t.clientY - rect.top;
+
+  if (currentTool === 'drag' && selectedPoint && !selectedPoint.pinned) {
+    selectedPoint.x = mouseX;
+    selectedPoint.y = mouseY;
+  } else if (currentTool === 'tear' || currentTool === 'burn') {
+    applyTool();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  mouseDown = false;
+  selectedPoint = null;
+}, { passive: false });
+
+function applyTool() {
+  const bs2 = brushSize * brushSize;
+
+  if (currentTool === 'tear') {
+    for (const c of constraints) {
+      if (!c.active) continue;
+      const mx = (c.p1.x + c.p2.x) / 2;
+      const my = (c.p1.y + c.p2.y) / 2;
+      const dx = mx - mouseX;
+      const dy = my - mouseY;
+      if (dx * dx + dy * dy < bs2) {
+        c.active = false;
+      }
+    }
+  } else if (currentTool === 'burn') {
+    for (const p of points) {
+      if (p.removed || p.burning) continue;
+      const dx = p.x - mouseX;
+      const dy = p.y - mouseY;
+      if (dx * dx + dy * dy < bs2 * 0.25) {
+        p.burning = true;
+      }
+    }
+  }
+}
+
+let lastTime = performance.now();
+let frameCount = 0;
+let lastFpsUpdate = 0;
+
+function simulate() {
+  const gravity = parseFloat(gravitySlider.value);
+  const wind = parseFloat(windSlider.value);
+  const iterations = parseInt(stiffnessSlider.value);
+  const damping = 0.99;
+
+  for (const p of points) {
+    p.update(gravity, wind, damping);
+  }
+
+  for (let i = 0; i < iterations; i++) {
+    for (const c of constraints) {
+      c.solve();
+    }
+  }
+}
+
+function render() {
+  const w = W / devicePixelRatio;
+  const h = H / devicePixelRatio;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.7);
+  bgGrad.addColorStop(0, '#12121e');
+  bgGrad.addColorStop(1, '#0a0a12');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  drawCloth();
+  drawBrushPreview();
+
+  frameCount++;
+  const now = performance.now();
+  if (now - lastFpsUpdate > 500) {
+    const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
+    fpsEl.textContent = `${fps} FPS`;
+    frameCount = 0;
+    lastFpsUpdate = now;
+
+    const activeConstraints = constraints.filter(c => c.active).length;
+    const activePoints = points.filter(p => !p.removed).length;
+    particleCountEl.textContent = `Particles: ${activePoints}`;
+    constraintCountEl.textContent = `Constraints: ${activeConstraints}`;
+  }
+}
+
+function loop() {
+  simulate();
+  render();
+  requestAnimationFrame(loop);
+}
+
+resetBtn.addEventListener('click', initCloth);
+presetSelect.addEventListener('change', initCloth);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1') { toolBtns[0].click(); }
+  if (e.key === '2') { toolBtns[1].click(); }
+  if (e.key === '3') { toolBtns[2].click(); }
+  if (e.key === '4') { toolBtns[3].click(); }
+  if (e.key === 'r' || e.key === 'R') { initCloth(); }
+});
+
+initCloth();
+loop();
+</script>
+</body>
+</html>
