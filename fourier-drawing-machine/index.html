@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fourier Drawing Machine</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a12;
+    color: #e0e0f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    background: #12121c;
+    border-bottom: 1px solid #2a2a3a;
+    flex-wrap: wrap;
+    z-index: 10;
+  }
+
+  .toolbar h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f7a846, #e74c8a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-right: 8px;
+  }
+
+  .toolbar .sep {
+    width: 1px;
+    height: 24px;
+    background: #2a2a3a;
+  }
+
+  .btn {
+    background: #1e1e2e;
+    border: 1px solid #3a3a50;
+    color: #d0d0e0;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn:hover { background: #2a2a40; border-color: #5050a0; }
+  .btn.active { background: #3030a0; border-color: #6060d0; color: #fff; }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .control-group label {
+    font-size: 0.75rem;
+    color: #8888aa;
+    white-space: nowrap;
+  }
+
+  .slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 4px;
+    background: #2a2a40;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #7070e0;
+    cursor: pointer;
+  }
+
+  .value-display {
+    font-size: 0.75rem;
+    color: #a0a0cc;
+    min-width: 28px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .canvas-container {
+    flex: 1;
+    position: relative;
+  }
+
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  #drawing-canvas { z-index: 2; cursor: crosshair; }
+  #main-canvas { z-index: 1; }
+
+  .overlay-msg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  .overlay-msg h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #d0d0f0;
+  }
+
+  .overlay-msg p {
+    font-size: 0.9rem;
+    color: #7777aa;
+  }
+
+  .info-panel {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    z-index: 5;
+    background: rgba(18, 18, 28, 0.85);
+    border: 1px solid #2a2a3a;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.75rem;
+    color: #8888aa;
+    backdrop-filter: blur(8px);
+    line-height: 1.6;
+  }
+
+  .info-panel span { color: #a0a0ee; font-weight: 600; }
+
+  .preset-menu {
+    position: relative;
+  }
+
+  .preset-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: #1a1a2a;
+    border: 1px solid #3a3a50;
+    border-radius: 8px;
+    padding: 4px;
+    z-index: 20;
+    min-width: 160px;
+  }
+
+  .preset-dropdown.show { display: block; }
+
+  .preset-item {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 6px;
+    color: #c0c0d0;
+    transition: background 0.1s;
+  }
+
+  .preset-item:hover { background: #2a2a44; }
+
+  .color-picker {
+    display: flex;
+    gap: 4px;
+  }
+
+  .color-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.active { border-color: #fff; }
+
+  @media (max-width: 768px) {
+    .toolbar { padding: 8px 12px; gap: 8px; }
+    .toolbar h1 { font-size: 0.95rem; }
+    input[type="range"] { width: 70px; }
+    .sep { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>Fourier Drawing Machine</h1>
+  <div class="sep"></div>
+  <button class="btn" id="clearBtn" title="Clear and draw again">
+    <span>Clear</span>
+  </button>
+  <div class="preset-menu">
+    <button class="btn" id="presetBtn">Presets</button>
+    <div class="preset-dropdown" id="presetDropdown">
+      <div class="preset-item" data-preset="star">Star</div>
+      <div class="preset-item" data-preset="heart">Heart</div>
+      <div class="preset-item" data-preset="treble">Treble Clef</div>
+      <div class="preset-item" data-preset="infinity">Infinity</div>
+      <div class="preset-item" data-preset="butterfly">Butterfly</div>
+      <div class="preset-item" data-preset="spiral">Spiral</div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="control-group">
+    <label>Circles</label>
+    <div class="slider-wrap">
+      <input type="range" id="circleSlider" min="1" max="200" value="50">
+      <span class="value-display" id="circleVal">50</span>
+    </div>
+  </div>
+  <div class="control-group">
+    <label>Speed</label>
+    <div class="slider-wrap">
+      <input type="range" id="speedSlider" min="1" max="100" value="30">
+      <span class="value-display" id="speedVal">30</span>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="control-group">
+    <label>Trail</label>
+    <div class="color-picker" id="colorPicker">
+      <div class="color-swatch active" data-color="#e74c8a" style="background:#e74c8a"></div>
+      <div class="color-swatch" data-color="#5ee7b7" style="background:#5ee7b7"></div>
+      <div class="color-swatch" data-color="#7c6ff7" style="background:#7c6ff7"></div>
+      <div class="color-swatch" data-color="#f7a846" style="background:#f7a846"></div>
+      <div class="color-swatch" data-color="#46b8f7" style="background:#46b8f7"></div>
+      <div class="color-swatch" data-color="#ffffff" style="background:#ffffff"></div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <button class="btn" id="circleToggle">Circles: On</button>
+  <button class="btn" id="pauseBtn">Pause</button>
+</div>
+
+<div class="canvas-container" id="canvasContainer">
+  <canvas id="main-canvas"></canvas>
+  <canvas id="drawing-canvas"></canvas>
+  <div class="overlay-msg" id="overlayMsg">
+    <h2>Draw a shape</h2>
+    <p>Click and drag to draw, then release to see Fourier magic</p>
+  </div>
+  <div class="info-panel" id="infoPanel" style="display:none">
+    <div>Epicycles: <span id="infoCircles">0</span></div>
+    <div>Sample points: <span id="infoPoints">0</span></div>
+    <div>Progress: <span id="infoProgress">0%</span></div>
+  </div>
+</div>
+
+<script>
+const mainCanvas = document.getElementById('main-canvas');
+const drawCanvas = document.getElementById('drawing-canvas');
+const mainCtx = mainCanvas.getContext('2d');
+const drawCtx = drawCanvas.getContext('2d');
+const container = document.getElementById('canvasContainer');
+const overlay = document.getElementById('overlayMsg');
+const infoPanel = document.getElementById('infoPanel');
+
+const circleSlider = document.getElementById('circleSlider');
+const speedSlider = document.getElementById('speedSlider');
+const circleVal = document.getElementById('circleVal');
+const speedVal = document.getElementById('speedVal');
+
+let width, height;
+let isDrawing = false;
+let drawnPath = [];
+let fourierCoeffs = [];
+let time = 0;
+let trailPoints = [];
+let animating = false;
+let paused = false;
+let showCircles = true;
+let trailColor = '#e74c8a';
+let numCircles = 50;
+let speedFactor = 30;
+let animId = null;
+
+function resize() {
+  const rect = container.getBoundingClientRect();
+  width = rect.width;
+  height = rect.height;
+  const dpr = window.devicePixelRatio || 1;
+  for (const c of [mainCanvas, drawCanvas]) {
+    c.width = width * dpr;
+    c.height = height * dpr;
+    c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+function getPos(e) {
+  const rect = drawCanvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+drawCanvas.addEventListener('mousedown', startDraw);
+drawCanvas.addEventListener('mousemove', moveDraw);
+drawCanvas.addEventListener('mouseup', endDraw);
+drawCanvas.addEventListener('mouseleave', endDraw);
+drawCanvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e); }, { passive: false });
+drawCanvas.addEventListener('touchmove', e => { e.preventDefault(); moveDraw(e); }, { passive: false });
+drawCanvas.addEventListener('touchend', e => { e.preventDefault(); endDraw(e); }, { passive: false });
+
+function startDraw(e) {
+  if (animating) return;
+  isDrawing = true;
+  drawnPath = [];
+  overlay.style.opacity = '0';
+  drawCtx.clearRect(0, 0, width, height);
+  const p = getPos(e);
+  drawnPath.push(p);
+}
+
+function moveDraw(e) {
+  if (!isDrawing) return;
+  const p = getPos(e);
+  drawnPath.push(p);
+  drawCtx.strokeStyle = '#555580';
+  drawCtx.lineWidth = 2;
+  drawCtx.lineCap = 'round';
+  if (drawnPath.length > 1) {
+    const prev = drawnPath[drawnPath.length - 2];
+    drawCtx.beginPath();
+    drawCtx.moveTo(prev.x, prev.y);
+    drawCtx.lineTo(p.x, p.y);
+    drawCtx.stroke();
+  }
+}
+
+function endDraw(e) {
+  if (!isDrawing) return;
+  isDrawing = false;
+  if (drawnPath.length < 10) {
+    drawnPath = [];
+    overlay.style.opacity = '1';
+    drawCtx.clearRect(0, 0, width, height);
+    return;
+  }
+  startFourier();
+}
+
+function resamplePath(path, n) {
+  const totalLen = pathLength(path);
+  const step = totalLen / n;
+  const result = [path[0]];
+  let dist = 0;
+  let idx = 0;
+
+  for (let i = 1; i < n; i++) {
+    const target = step * i;
+    while (idx < path.length - 1) {
+      const seg = Math.hypot(path[idx + 1].x - path[idx].x, path[idx + 1].y - path[idx].y);
+      if (dist + seg >= target) {
+        const t = (target - dist) / seg;
+        result.push({
+          x: path[idx].x + t * (path[idx + 1].x - path[idx].x),
+          y: path[idx].y + t * (path[idx + 1].y - path[idx].y)
+        });
+        break;
+      }
+      dist += seg;
+      idx++;
+    }
+  }
+  return result;
+}
+
+function pathLength(path) {
+  let len = 0;
+  for (let i = 1; i < path.length; i++) {
+    len += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  }
+  return len;
+}
+
+function computeDFT(points) {
+  const N = points.length;
+  const coeffs = [];
+  for (let k = 0; k < N; k++) {
+    let re = 0, im = 0;
+    for (let n = 0; n < N; n++) {
+      const angle = (2 * Math.PI * k * n) / N;
+      re += points[n].x * Math.cos(angle) + points[n].y * Math.sin(angle);
+      im += points[n].y * Math.cos(angle) - points[n].x * Math.sin(angle);
+    }
+    re /= N;
+    im /= N;
+    const amp = Math.sqrt(re * re + im * im);
+    const phase = Math.atan2(im, re);
+    let freq = k;
+    if (freq > N / 2) freq -= N;
+    coeffs.push({ re, im, freq: k, amp, phase });
+  }
+  coeffs.sort((a, b) => b.amp - a.amp);
+  return coeffs;
+}
+
+function startFourier() {
+  const nSamples = Math.min(drawnPath.length, 512);
+  const samples = resamplePath(drawnPath, nSamples);
+  fourierCoeffs = computeDFT(samples);
+  time = 0;
+  trailPoints = [];
+  animating = true;
+  paused = false;
+  drawCanvas.style.pointerEvents = 'none';
+  infoPanel.style.display = 'block';
+  document.getElementById('infoPoints').textContent = nSamples;
+  updatePauseBtn();
+
+  if (animId) cancelAnimationFrame(animId);
+  animate();
+}
+
+function animate() {
+  if (paused) {
+    animId = requestAnimationFrame(animate);
+    return;
+  }
+
+  mainCtx.clearRect(0, 0, width, height);
+  drawCtx.clearRect(0, 0, width, height);
+
+  const N = fourierCoeffs.length;
+  const useN = Math.min(numCircles, N);
+  document.getElementById('infoCircles').textContent = useN;
+
+  let x = 0, y = 0;
+
+  if (showCircles) {
+    for (let i = 0; i < useN; i++) {
+      const c = fourierCoeffs[i];
+      const prevX = x, prevY = y;
+      const angle = c.freq * time * 2 * Math.PI + c.phase;
+      x += c.amp * Math.cos(angle);
+      y += c.amp * Math.sin(angle);
+
+      mainCtx.beginPath();
+      mainCtx.arc(prevX, prevY, c.amp, 0, Math.PI * 2);
+      mainCtx.strokeStyle = `rgba(100, 100, 180, ${0.15 + 0.15 * (1 - i / useN)})`;
+      mainCtx.lineWidth = 1;
+      mainCtx.stroke();
+
+      mainCtx.beginPath();
+      mainCtx.moveTo(prevX, prevY);
+      mainCtx.lineTo(x, y);
+      mainCtx.strokeStyle = `rgba(140, 140, 220, ${0.3 + 0.2 * (1 - i / useN)})`;
+      mainCtx.lineWidth = 1;
+      mainCtx.stroke();
+    }
+
+    mainCtx.beginPath();
+    mainCtx.arc(x, y, 3, 0, Math.PI * 2);
+    mainCtx.fillStyle = '#fff';
+    mainCtx.fill();
+  } else {
+    for (let i = 0; i < useN; i++) {
+      const c = fourierCoeffs[i];
+      const angle = c.freq * time * 2 * Math.PI + c.phase;
+      x += c.amp * Math.cos(angle);
+      y += c.amp * Math.sin(angle);
+    }
+  }
+
+  trailPoints.push({ x, y });
+
+  if (trailPoints.length > 1) {
+    mainCtx.beginPath();
+    mainCtx.moveTo(trailPoints[0].x, trailPoints[0].y);
+    for (let i = 1; i < trailPoints.length; i++) {
+      mainCtx.lineTo(trailPoints[i].x, trailPoints[i].y);
+    }
+    mainCtx.strokeStyle = trailColor;
+    mainCtx.lineWidth = 2.5;
+    mainCtx.lineCap = 'round';
+    mainCtx.lineJoin = 'round';
+    mainCtx.shadowColor = trailColor;
+    mainCtx.shadowBlur = 8;
+    mainCtx.stroke();
+    mainCtx.shadowBlur = 0;
+  }
+
+  const dt = (speedFactor / 3000);
+  time += dt;
+
+  const progress = Math.min(time * 100, 100);
+  document.getElementById('infoProgress').textContent = progress.toFixed(1) + '%';
+
+  if (time >= 1) {
+    time = 0;
+    trailPoints = [];
+  }
+
+  animId = requestAnimationFrame(animate);
+}
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (animId) cancelAnimationFrame(animId);
+  animating = false;
+  paused = false;
+  time = 0;
+  trailPoints = [];
+  drawnPath = [];
+  fourierCoeffs = [];
+  mainCtx.clearRect(0, 0, width, height);
+  drawCtx.clearRect(0, 0, width, height);
+  drawCanvas.style.pointerEvents = 'auto';
+  overlay.style.opacity = '1';
+  infoPanel.style.display = 'none';
+  updatePauseBtn();
+});
+
+circleSlider.addEventListener('input', () => {
+  numCircles = parseInt(circleSlider.value);
+  circleVal.textContent = numCircles;
+});
+
+speedSlider.addEventListener('input', () => {
+  speedFactor = parseInt(speedSlider.value);
+  speedVal.textContent = speedFactor;
+});
+
+document.getElementById('circleToggle').addEventListener('click', function() {
+  showCircles = !showCircles;
+  this.textContent = showCircles ? 'Circles: On' : 'Circles: Off';
+  this.classList.toggle('active', !showCircles);
+});
+
+const pauseBtn = document.getElementById('pauseBtn');
+pauseBtn.addEventListener('click', () => {
+  if (!animating) return;
+  paused = !paused;
+  updatePauseBtn();
+});
+
+function updatePauseBtn() {
+  pauseBtn.textContent = paused ? 'Play' : 'Pause';
+  pauseBtn.classList.toggle('active', paused);
+}
+
+document.querySelectorAll('.color-swatch').forEach(el => {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    this.classList.add('active');
+    trailColor = this.dataset.color;
+  });
+});
+
+const presetBtn = document.getElementById('presetBtn');
+const presetDropdown = document.getElementById('presetDropdown');
+
+presetBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  presetDropdown.classList.toggle('show');
+});
+
+document.addEventListener('click', () => presetDropdown.classList.remove('show'));
+
+const presets = {
+  star: () => {
+    const pts = [];
+    const cx = width / 2, cy = height / 2;
+    const outerR = Math.min(width, height) * 0.3;
+    const innerR = outerR * 0.4;
+    for (let i = 0; i <= 360; i += 2) {
+      const angle = (i - 90) * Math.PI / 180;
+      const r = (i % 72 < 36) ? outerR : innerR;
+      const t = (i % 72) / 36;
+      const blend = (i % 72 < 36) ?
+        innerR + (outerR - innerR) * (t) :
+        outerR + (innerR - outerR) * (t);
+      pts.push({ x: cx + blend * Math.cos(angle), y: cy + blend * Math.sin(angle) });
+    }
+    return pts;
+  },
+  heart: () => {
+    const pts = [];
+    const cx = width / 2, cy = height / 2;
+    const scale = Math.min(width, height) * 0.018;
+    for (let t = 0; t <= 2 * Math.PI; t += 0.02) {
+      const x = 16 * Math.pow(Math.sin(t), 3);
+      const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+      pts.push({ x: cx + x * scale, y: cy + y * scale });
+    }
+    return pts;
+  },
+  treble: () => {
+    const pts = [];
+    const cx = width / 2, cy = height / 2;
+    const s = Math.min(width, height) * 0.25;
+    for (let t = 0; t <= 2 * Math.PI; t += 0.015) {
+      const x = Math.sin(t) + 0.5 * Math.sin(2 * t);
+      const y = -Math.cos(t) - 0.5 * Math.cos(2 * t) + 0.3 * Math.sin(3 * t);
+      pts.push({ x: cx + x * s * 0.6, y: cy + y * s * 0.6 });
+    }
+    return pts;
+  },
+  infinity: () => {
+    const pts = [];
+    const cx = width / 2, cy = height / 2;
+    const s = Math.min(width, height) * 0.28;
+    for (let t = 0; t <= 2 * Math.PI; t += 0.015) {
+      const denom = 1 + Math.sin(t) * Math.sin(t);
+      const x = Math.cos(t) / denom;
+      const y = Math.sin(t) * Math.cos(t) / denom;
+      pts.push({ x: cx + x * s, y: cy + y * s });
+    }
+    return pts;
+  },
+  butterfly: () => {
+    const pts = [];
+    const cx = width / 2, cy = height / 2;
+    const s = Math.min(width, height) * 0.06;
+    for (let t = 0; t <= 2 * Math.PI; t += 0.015) {
+      const r = Math.exp(Math.sin(t)) - 2 * Math.cos(4 * t) + Math.pow(Math.sin((2 * t - Math.PI) / 24), 5);
+      pts.push({ x: cx + r * Math.cos(t) * s * 1.5, y: cy - r * Math.sin(t) * s * 1.5 });
+    }
+    return pts;
+  },
+  spiral: () => {
+    const pts = [];
+    const cx = width / 2, cy = height / 2;
+    const maxR = Math.min(width, height) * 0.35;
+    const turns = 3;
+    for (let i = 0; i <= 500; i++) {
+      const t = (i / 500) * turns * 2 * Math.PI;
+      const r = (i / 500) * maxR;
+      pts.push({ x: cx + r * Math.cos(t), y: cy + r * Math.sin(t) });
+    }
+    return pts;
+  }
+};
+
+document.querySelectorAll('.preset-item').forEach(el => {
+  el.addEventListener('click', () => {
+    presetDropdown.classList.remove('show');
+    const name = el.dataset.preset;
+    if (presets[name]) {
+      if (animId) cancelAnimationFrame(animId);
+      animating = false;
+      mainCtx.clearRect(0, 0, width, height);
+      drawCtx.clearRect(0, 0, width, height);
+      overlay.style.opacity = '0';
+
+      drawnPath = presets[name]();
+
+      drawCtx.beginPath();
+      drawCtx.moveTo(drawnPath[0].x, drawnPath[0].y);
+      for (let i = 1; i < drawnPath.length; i++) {
+        drawCtx.lineTo(drawnPath[i].x, drawnPath[i].y);
+      }
+      drawCtx.strokeStyle = '#555580';
+      drawCtx.lineWidth = 2;
+      drawCtx.stroke();
+
+      setTimeout(() => startFourier(), 300);
+    }
+  });
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' && animating) {
+    e.preventDefault();
+    paused = !paused;
+    updatePauseBtn();
+  }
+  if (e.key === 'c' || e.key === 'C') {
+    document.getElementById('clearBtn').click();
+  }
+});
+</script>
+</body>
+</html>
