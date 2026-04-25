@@ -18,6 +18,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "fluid-dynamics", "-l", "3458"],
       "port": 3458
+    },
+    {
+      "name": "fractal-explorer",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "fractal-explorer", "-l", "3459"],
+      "port": 3459
     }
   ]
 }

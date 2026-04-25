@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fractal Explorer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #e8e8f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  canvas {
+    display: block;
+    cursor: crosshair;
+  }
+
+  .controls {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: rgba(10, 10, 15, 0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 20px;
+    width: 280px;
+    z-index: 10;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+
+  .controls.collapsed {
+    transform: translateX(-240px);
+    opacity: 0.6;
+  }
+
+  .controls.collapsed:hover {
+    opacity: 1;
+  }
+
+  .controls h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .controls h2 span {
+    font-size: 1.2rem;
+  }
+
+  .control-group {
+    margin-bottom: 14px;
+  }
+
+  .control-group label {
+    display: block;
+    font-size: 0.72rem;
+    color: #7a7a8c;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+
+  .control-group select,
+  .control-group input[type="range"] {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e8e8f0;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .control-group select:focus {
+    border-color: #7c6ff7;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0;
+    border: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #7c6ff7;
+    cursor: pointer;
+    border: 2px solid #0a0a0f;
+  }
+
+  .range-value {
+    font-size: 0.75rem;
+    color: #5ee7b7;
+    float: right;
+    margin-top: -18px;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: rgba(124, 111, 247, 0.15);
+    border: 1px solid rgba(124, 111, 247, 0.3);
+    border-radius: 8px;
+    color: #b4a9ff;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .btn:hover {
+    background: rgba(124, 111, 247, 0.3);
+    color: #fff;
+  }
+
+  .btn.active {
+    background: rgba(94, 231, 183, 0.2);
+    border-color: rgba(94, 231, 183, 0.4);
+    color: #5ee7b7;
+  }
+
+  .info-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 0.72rem;
+    color: #7a7a8c;
+    display: flex;
+    gap: 20px;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  .info-bar .val {
+    color: #5ee7b7;
+    font-weight: 500;
+  }
+
+  .help-hint {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 0.72rem;
+    color: #7a7a8c;
+    line-height: 1.8;
+    z-index: 10;
+  }
+
+  .help-hint kbd {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.7rem;
+    color: #b4a9ff;
+  }
+
+  .crosshair {
+    position: fixed;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .crosshair-h, .crosshair-v {
+    position: fixed;
+    background: rgba(124, 111, 247, 0.15);
+  }
+
+  .crosshair-h {
+    width: 100%;
+    height: 1px;
+    left: 0;
+  }
+
+  .crosshair-v {
+    width: 1px;
+    height: 100%;
+    top: 0;
+  }
+
+  .julia-preview {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 180px;
+    height: 180px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    z-index: 10;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+
+  .julia-preview canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .julia-preview .label {
+    position: absolute;
+    bottom: 6px;
+    left: 8px;
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+
+  .loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.85rem;
+    color: #7c6ff7;
+    z-index: 20;
+    display: none;
+  }
+
+  .loading.visible {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="fractal"></canvas>
+
+<div class="controls" id="controls">
+  <h2><span>🔍</span> Fractal Explorer</h2>
+
+  <div class="control-group">
+    <label>Fractal Type</label>
+    <select id="fractalType">
+      <option value="mandelbrot">Mandelbrot Set</option>
+      <option value="julia">Julia Set</option>
+      <option value="burningship">Burning Ship</option>
+      <option value="tricorn">Tricorn (Mandelbar)</option>
+      <option value="multibrot3">Multibrot (power 3)</option>
+      <option value="multibrot4">Multibrot (power 4)</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <label>Color Scheme</label>
+    <select id="colorScheme">
+      <option value="electric">Electric</option>
+      <option value="fire">Fire</option>
+      <option value="ocean">Ocean</option>
+      <option value="rainbow">Rainbow</option>
+      <option value="monochrome">Monochrome</option>
+      <option value="neon">Neon</option>
+      <option value="sunset">Sunset</option>
+      <option value="ice">Ice</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <label>Max Iterations <span class="range-value" id="iterVal">200</span></label>
+    <input type="range" id="maxIter" min="50" max="2000" value="200" step="10">
+  </div>
+
+  <div class="control-group">
+    <label>Color Cycle Speed <span class="range-value" id="cycleVal">0</span></label>
+    <input type="range" id="colorCycle" min="0" max="100" value="0" step="1">
+  </div>
+
+  <div class="control-group">
+    <label>Smooth Coloring</label>
+    <div class="btn-row" style="margin-top:4px">
+      <div class="btn active" id="smoothOn" onclick="setSmoothColoring(true)">On</div>
+      <div class="btn" id="smoothOff" onclick="setSmoothColoring(false)">Off</div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <div class="btn" onclick="resetView()">Reset View</div>
+    <div class="btn" onclick="saveImage()">Save PNG</div>
+  </div>
+
+  <div class="btn-row">
+    <div class="btn" id="juliaToggle" onclick="toggleJuliaPreview()">Julia Preview: Off</div>
+  </div>
+</div>
+
+<div class="help-hint" id="helpHint">
+  <kbd>Scroll</kbd> Zoom &nbsp; <kbd>Drag</kbd> Pan &nbsp; <kbd>H</kbd> Toggle UI<br>
+  <kbd>Click</kbd> Zoom in &nbsp; <kbd>Shift+Click</kbd> Zoom out<br>
+  <kbd>J</kbd> Julia preview &nbsp; <kbd>R</kbd> Reset
+</div>
+
+<div class="info-bar" id="infoBar">
+  <div>Center: <span class="val" id="infoCenter">0 + 0i</span></div>
+  <div>Zoom: <span class="val" id="infoZoom">1x</span></div>
+  <div>Cursor: <span class="val" id="infoCursor">-</span></div>
+</div>
+
+<div class="crosshair">
+  <div class="crosshair-h" id="crossH"></div>
+  <div class="crosshair-v" id="crossV"></div>
+</div>
+
+<div class="julia-preview" id="juliaPreview">
+  <canvas id="juliaCanvas"></canvas>
+  <div class="label">Julia set preview</div>
+</div>
+
+<div class="loading" id="loading">Rendering...</div>
+
+<script>
+const canvas = document.getElementById('fractal');
+const ctx = canvas.getContext('2d');
+const juliaCanvas = document.getElementById('juliaCanvas');
+const juliaCtx = juliaCanvas.getContext('2d');
+
+let W, H;
+let centerX = -0.5, centerY = 0;
+let zoom = 1;
+let maxIter = 200;
+let fractalType = 'mandelbrot';
+let colorScheme = 'electric';
+let smoothColoring = true;
+let colorOffset = 0;
+let cycleSpeed = 0;
+let isDragging = false;
+let dragStartX, dragStartY;
+let dragCenterX, dragCenterY;
+let showJuliaPreview = false;
+let mouseX = 0, mouseY = 0;
+let juliaC = { r: -0.7, i: 0.27015 };
+let renderWorkers = [];
+let renderID = 0;
+let uiVisible = true;
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W;
+  canvas.height = H;
+  render();
+}
+
+window.addEventListener('resize', resize);
+
+function pixelToComplex(px, py) {
+  const aspect = W / H;
+  const scale = 3 / zoom;
+  return {
+    r: centerX + (px / W - 0.5) * scale * aspect,
+    i: centerY + (py / H - 0.5) * scale
+  };
+}
+
+function mandelbrot(cr, ci, maxIter) {
+  let zr = 0, zi = 0, zr2 = 0, zi2 = 0;
+  let i = 0;
+  for (; i < maxIter && zr2 + zi2 <= 4; i++) {
+    zi = 2 * zr * zi + ci;
+    zr = zr2 - zi2 + cr;
+    zr2 = zr * zr;
+    zi2 = zi * zi;
+  }
+  if (i === maxIter) return -1;
+  if (smoothColoring) {
+    return i + 1 - Math.log(Math.log(Math.sqrt(zr2 + zi2))) / Math.log(2);
+  }
+  return i;
+}
+
+function juliaIter(zr, zi, cr, ci, maxIter) {
+  let zr2 = zr * zr, zi2 = zi * zi;
+  let i = 0;
+  for (; i < maxIter && zr2 + zi2 <= 4; i++) {
+    zi = 2 * zr * zi + ci;
+    zr = zr2 - zi2 + cr;
+    zr2 = zr * zr;
+    zi2 = zi * zi;
+  }
+  if (i === maxIter) return -1;
+  if (smoothColoring) {
+    return i + 1 - Math.log(Math.log(Math.sqrt(zr2 + zi2))) / Math.log(2);
+  }
+  return i;
+}
+
+function burningShip(cr, ci, maxIter) {
+  let zr = 0, zi = 0, zr2 = 0, zi2 = 0;
+  let i = 0;
+  for (; i < maxIter && zr2 + zi2 <= 4; i++) {
+    zi = Math.abs(2 * zr * zi) + ci;
+    zr = zr2 - zi2 + cr;
+    zr2 = zr * zr;
+    zi2 = zi * zi;
+  }
+  if (i === maxIter) return -1;
+  if (smoothColoring) {
+    return i + 1 - Math.log(Math.log(Math.sqrt(zr2 + zi2))) / Math.log(2);
+  }
+  return i;
+}
+
+function tricorn(cr, ci, maxIter) {
+  let zr = 0, zi = 0, zr2 = 0, zi2 = 0;
+  let i = 0;
+  for (; i < maxIter && zr2 + zi2 <= 4; i++) {
+    zi = -2 * zr * zi + ci;
+    zr = zr2 - zi2 + cr;
+    zr2 = zr * zr;
+    zi2 = zi * zi;
+  }
+  if (i === maxIter) return -1;
+  if (smoothColoring) {
+    return i + 1 - Math.log(Math.log(Math.sqrt(zr2 + zi2))) / Math.log(2);
+  }
+  return i;
+}
+
+function multibrot(cr, ci, power, maxIter) {
+  let zr = 0, zi = 0;
+  let i = 0;
+  for (; i < maxIter; i++) {
+    const r2 = zr * zr + zi * zi;
+    if (r2 > 4) break;
+    const r = Math.sqrt(r2);
+    const theta = Math.atan2(zi, zr);
+    const rn = Math.pow(r, power);
+    const tn = theta * power;
+    zr = rn * Math.cos(tn) + cr;
+    zi = rn * Math.sin(tn) + ci;
+  }
+  if (i === maxIter) return -1;
+  if (smoothColoring) {
+    const r2 = zr * zr + zi * zi;
+    return i + 1 - Math.log(Math.log(Math.sqrt(r2))) / Math.log(power);
+  }
+  return i;
+}
+
+function computePixel(cr, ci, maxIter, type, jc) {
+  switch (type) {
+    case 'mandelbrot': return mandelbrot(cr, ci, maxIter);
+    case 'julia': return juliaIter(cr, ci, jc.r, jc.i, maxIter);
+    case 'burningship': return burningShip(cr, ci, maxIter);
+    case 'tricorn': return tricorn(cr, ci, maxIter);
+    case 'multibrot3': return multibrot(cr, ci, 3, maxIter);
+    case 'multibrot4': return multibrot(cr, ci, 4, maxIter);
+    default: return mandelbrot(cr, ci, maxIter);
+  }
+}
+
+function hslToRgb(h, s, l) {
+  h = h % 360;
+  if (h < 0) h += 360;
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r, g, b;
+  if (h < 60) { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+
+function getColor(iter, maxIter, offset) {
+  if (iter < 0) return [0, 0, 0];
+  const t = (iter + offset) / maxIter;
+  const t2 = (iter + offset) % 256 / 256;
+  switch (colorScheme) {
+    case 'electric': {
+      const h = 220 + t2 * 160;
+      const s = 80 + Math.sin(t2 * Math.PI) * 20;
+      const l = 5 + t2 * 55;
+      return hslToRgb(h, s, l);
+    }
+    case 'fire': {
+      const r = Math.min(255, t2 * 3 * 255);
+      const g = Math.min(255, Math.max(0, (t2 - 0.33) * 3 * 255));
+      const b = Math.min(255, Math.max(0, (t2 - 0.67) * 3 * 200));
+      return [r, g, b];
+    }
+    case 'ocean': {
+      const h = 180 + t2 * 60;
+      const s = 70 + Math.sin(t2 * Math.PI * 2) * 30;
+      const l = 10 + t2 * 50;
+      return hslToRgb(h, s, l);
+    }
+    case 'rainbow': {
+      return hslToRgb(t2 * 360, 85, 50);
+    }
+    case 'monochrome': {
+      const v = t2 * 255;
+      return [v, v, v];
+    }
+    case 'neon': {
+      const h = (t2 * 360 + 120) % 360;
+      return hslToRgb(h, 100, 50 + Math.sin(t2 * Math.PI * 4) * 15);
+    }
+    case 'sunset': {
+      const r = 255 * Math.sin(t2 * Math.PI * 0.5 + 0.2);
+      const g = 255 * Math.sin(t2 * Math.PI * 0.5 - 0.5);
+      const b = 255 * Math.sin(t2 * Math.PI * 0.5 + 1.5);
+      return [Math.max(0, r), Math.max(0, g), Math.max(0, b)];
+    }
+    case 'ice': {
+      const h = 180 + t2 * 40;
+      const s = 40 + t2 * 40;
+      const l = 20 + t2 * 60;
+      return hslToRgb(h, s, l);
+    }
+    default:
+      return hslToRgb(t2 * 360, 80, 50);
+  }
+}
+
+let animFrame = null;
+
+function render() {
+  const id = ++renderID;
+  const aspect = W / H;
+  const scale = 3 / zoom;
+
+  const imgData = ctx.createImageData(W, H);
+  const data = imgData.data;
+
+  const chunkSize = Math.ceil(H / 8);
+
+  function renderChunk(startY) {
+    if (id !== renderID) return;
+    const endY = Math.min(startY + chunkSize, H);
+
+    for (let py = startY; py < endY; py++) {
+      for (let px = 0; px < W; px++) {
+        const cr = centerX + (px / W - 0.5) * scale * aspect;
+        const ci = centerY + (py / H - 0.5) * scale;
+        const iter = computePixel(cr, ci, maxIter, fractalType, juliaC);
+        const [r, g, b] = getColor(iter, maxIter, colorOffset);
+        const idx = (py * W + px) * 4;
+        data[idx] = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0, 0, startY, W, endY - startY);
+
+    if (endY < H) {
+      requestAnimationFrame(() => renderChunk(endY));
+    }
+  }
+
+  renderChunk(0);
+}
+
+function renderJuliaPreview(cr, ci) {
+  if (!showJuliaPreview) return;
+  const jW = 180, jH = 180;
+  juliaCanvas.width = jW;
+  juliaCanvas.height = jH;
+  const imgData = juliaCtx.createImageData(jW, jH);
+  const data = imgData.data;
+  const scale = 3;
+  const jMaxIter = Math.min(maxIter, 200);
+
+  for (let py = 0; py < jH; py++) {
+    for (let px = 0; px < jW; px++) {
+      const zr = (px / jW - 0.5) * scale;
+      const zi = (py / jH - 0.5) * scale;
+      const iter = juliaIter(zr, zi, cr, ci, jMaxIter);
+      const [r, g, b] = getColor(iter, jMaxIter, colorOffset);
+      const idx = (py * jW + px) * 4;
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = 255;
+    }
+  }
+  juliaCtx.putImageData(imgData, 0, 0);
+}
+
+function resetView() {
+  centerX = -0.5;
+  centerY = 0;
+  zoom = 1;
+  if (fractalType === 'burningship') {
+    centerX = -0.4;
+    centerY = -0.5;
+  }
+  updateInfo();
+  render();
+}
+
+function setSmoothColoring(val) {
+  smoothColoring = val;
+  document.getElementById('smoothOn').className = 'btn' + (val ? ' active' : '');
+  document.getElementById('smoothOff').className = 'btn' + (!val ? ' active' : '');
+  render();
+}
+
+function toggleJuliaPreview() {
+  showJuliaPreview = !showJuliaPreview;
+  document.getElementById('juliaPreview').style.display = showJuliaPreview ? 'block' : 'none';
+  document.getElementById('juliaToggle').textContent = 'Julia Preview: ' + (showJuliaPreview ? 'On' : 'Off');
+  document.getElementById('juliaToggle').className = 'btn' + (showJuliaPreview ? ' active' : '');
+  if (showJuliaPreview) {
+    const c = pixelToComplex(mouseX, mouseY);
+    renderJuliaPreview(c.r, c.i);
+  }
+}
+
+function saveImage() {
+  const link = document.createElement('a');
+  link.download = `fractal-${fractalType}-${Date.now()}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function updateInfo() {
+  document.getElementById('infoCenter').textContent =
+    `${centerX.toFixed(8)} ${centerY >= 0 ? '+' : ''} ${centerY.toFixed(8)}i`;
+  document.getElementById('infoZoom').textContent =
+    zoom >= 1000 ? zoom.toExponential(2) + 'x' : zoom.toFixed(1) + 'x';
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragCenterX = centerX;
+  dragCenterY = centerY;
+  canvas.style.cursor = 'grabbing';
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+
+  document.getElementById('crossH').style.top = e.clientY + 'px';
+  document.getElementById('crossV').style.left = e.clientX + 'px';
+
+  const c = pixelToComplex(e.clientX, e.clientY);
+  document.getElementById('infoCursor').textContent =
+    `${c.r.toFixed(6)} ${c.i >= 0 ? '+' : ''} ${c.i.toFixed(6)}i`;
+
+  if (isDragging) {
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    const aspect = W / H;
+    const scale = 3 / zoom;
+    centerX = dragCenterX - (dx / W) * scale * aspect;
+    centerY = dragCenterY - (dy / H) * scale;
+    updateInfo();
+    render();
+  }
+
+  if (showJuliaPreview && !isDragging) {
+    renderJuliaPreview(c.r, c.i);
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  isDragging = false;
+  canvas.style.cursor = 'crosshair';
+});
+
+canvas.addEventListener('mouseleave', () => {
+  isDragging = false;
+  canvas.style.cursor = 'crosshair';
+});
+
+canvas.addEventListener('click', (e) => {
+  if (Math.abs(e.clientX - dragStartX) > 5 || Math.abs(e.clientY - dragStartY) > 5) return;
+  const c = pixelToComplex(e.clientX, e.clientY);
+  if (e.shiftKey) {
+    zoom /= 2;
+  } else {
+    centerX = c.r;
+    centerY = c.i;
+    zoom *= 2;
+  }
+  updateInfo();
+  render();
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const c = pixelToComplex(e.clientX, e.clientY);
+  const factor = e.deltaY < 0 ? 1.3 : 1 / 1.3;
+  const newZoom = zoom * factor;
+
+  centerX = c.r + (centerX - c.r) * (zoom / newZoom);
+  centerY = c.i + (centerY - c.i) * (zoom / newZoom);
+  zoom = newZoom;
+
+  updateInfo();
+  render();
+}, { passive: false });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'h' || e.key === 'H') {
+    uiVisible = !uiVisible;
+    document.getElementById('controls').style.display = uiVisible ? 'block' : 'none';
+    document.getElementById('helpHint').style.display = uiVisible ? 'block' : 'none';
+    document.getElementById('infoBar').style.display = uiVisible ? 'flex' : 'none';
+  }
+  if (e.key === 'r' || e.key === 'R') resetView();
+  if (e.key === 'j' || e.key === 'J') toggleJuliaPreview();
+});
+
+document.getElementById('fractalType').addEventListener('change', (e) => {
+  fractalType = e.target.value;
+  if (fractalType === 'julia') {
+    const c = pixelToComplex(W / 2, H / 2);
+    juliaC = { r: c.r, i: c.i };
+  }
+  resetView();
+});
+
+document.getElementById('colorScheme').addEventListener('change', (e) => {
+  colorScheme = e.target.value;
+  render();
+});
+
+document.getElementById('maxIter').addEventListener('input', (e) => {
+  maxIter = parseInt(e.target.value);
+  document.getElementById('iterVal').textContent = maxIter;
+  render();
+});
+
+document.getElementById('colorCycle').addEventListener('input', (e) => {
+  cycleSpeed = parseInt(e.target.value);
+  document.getElementById('cycleVal').textContent = cycleSpeed;
+  if (cycleSpeed > 0 && !animFrame) startColorCycle();
+});
+
+function startColorCycle() {
+  if (cycleSpeed === 0) {
+    animFrame = null;
+    return;
+  }
+  colorOffset += cycleSpeed * 0.3;
+  render();
+  animFrame = requestAnimationFrame(startColorCycle);
+}
+
+// Touch support
+let touchStart = null;
+let pinchDist = null;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    dragCenterX = centerX;
+    dragCenterY = centerY;
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    pinchDist = Math.sqrt(dx * dx + dy * dy);
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (e.touches.length === 1 && touchStart) {
+    const dx = e.touches[0].clientX - touchStart.x;
+    const dy = e.touches[0].clientY - touchStart.y;
+    const aspect = W / H;
+    const scale = 3 / zoom;
+    centerX = dragCenterX - (dx / W) * scale * aspect;
+    centerY = dragCenterY - (dy / H) * scale;
+    updateInfo();
+    render();
+  } else if (e.touches.length === 2 && pinchDist) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const factor = dist / pinchDist;
+    zoom *= factor;
+    pinchDist = dist;
+    updateInfo();
+    render();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  if (e.touches.length === 0) {
+    if (touchStart) {
+      touchStart = null;
+    }
+    pinchDist = null;
+  }
+});
+
+// Double tap to zoom
+let lastTap = 0;
+canvas.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTap < 300) {
+    const touch = e.changedTouches[0];
+    const c = pixelToComplex(touch.clientX, touch.clientY);
+    centerX = c.r;
+    centerY = c.i;
+    zoom *= 2;
+    updateInfo();
+    render();
+  }
+  lastTap = now;
+});
+
+// Init
+resize();
+updateInfo();
+</script>
+</body>
+</html>

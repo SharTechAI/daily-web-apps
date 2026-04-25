@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reaction-Diffusion Simulator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #e0e0e8;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  .sidebar {
+    width: 280px;
+    background: #111118;
+    border-right: 1px solid #2a2a35;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .sidebar h1 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ff6b9d, #c084fc, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .sidebar .subtitle {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  .section {
+    background: #16161e;
+    border: 1px solid #2a2a35;
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .section-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #666;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+
+  .control {
+    margin-bottom: 10px;
+  }
+
+  .control:last-child { margin-bottom: 0; }
+
+  .control label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    color: #aaa;
+    margin-bottom: 4px;
+  }
+
+  .control label .val {
+    color: #c084fc;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: #2a2a35;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #c084fc;
+    cursor: pointer;
+    border: 2px solid #0a0a0f;
+  }
+
+  .presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .preset-btn {
+    background: #1e1e28;
+    border: 1px solid #2a2a35;
+    color: #ccc;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .preset-btn:hover {
+    border-color: #c084fc;
+    color: #fff;
+    background: #22222e;
+  }
+
+  .preset-btn.active {
+    border-color: #c084fc;
+    background: rgba(192, 132, 252, 0.15);
+    color: #c084fc;
+  }
+
+  .actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    flex: 1;
+    min-width: 70px;
+    background: #1e1e28;
+    border: 1px solid #2a2a35;
+    color: #ccc;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .action-btn:hover {
+    border-color: #c084fc;
+    color: #fff;
+  }
+
+  .action-btn.primary {
+    background: rgba(192, 132, 252, 0.15);
+    border-color: #c084fc;
+    color: #c084fc;
+  }
+
+  .color-schemes {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .color-swatch {
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+  }
+
+  .color-swatch:hover, .color-swatch.active {
+    border-color: #fff;
+  }
+
+  .brush-sizes {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brush-size {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1e1e28;
+    border: 1px solid #2a2a35;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .brush-size:hover, .brush-size.active {
+    border-color: #c084fc;
+  }
+
+  .brush-dot {
+    border-radius: 50%;
+    background: #c084fc;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: #08080c;
+  }
+
+  canvas {
+    image-rendering: pixelated;
+    cursor: crosshair;
+  }
+
+  .stats {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.7);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    color: #888;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    color: #666;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  @media (max-width: 768px) {
+    body { flex-direction: column; }
+    .sidebar {
+      width: 100%;
+      max-height: 40vh;
+      border-right: none;
+      border-bottom: 1px solid #2a2a35;
+      padding: 12px;
+      gap: 10px;
+    }
+    .canvas-wrap { min-height: 60vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div>
+    <h1>Reaction-Diffusion</h1>
+    <div class="subtitle">Gray-Scott Model · Turing Patterns</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Presets</div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Parameters</div>
+    <div class="control">
+      <label>Feed Rate <span class="val" id="feed-val">0.055</span></label>
+      <input type="range" id="feed" min="0.01" max="0.10" step="0.001" value="0.055">
+    </div>
+    <div class="control">
+      <label>Kill Rate <span class="val" id="kill-val">0.062</span></label>
+      <input type="range" id="kill" min="0.03" max="0.07" step="0.001" value="0.062">
+    </div>
+    <div class="control">
+      <label>Diffusion A <span class="val" id="da-val">1.00</span></label>
+      <input type="range" id="da" min="0.1" max="1.5" step="0.01" value="1.0">
+    </div>
+    <div class="control">
+      <label>Diffusion B <span class="val" id="db-val">0.50</span></label>
+      <input type="range" id="db" min="0.1" max="1.0" step="0.01" value="0.5">
+    </div>
+    <div class="control">
+      <label>Speed <span class="val" id="speed-val">8</span></label>
+      <input type="range" id="speed" min="1" max="20" step="1" value="8">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Brush</div>
+    <div class="brush-sizes" id="brush-sizes"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Color Scheme</div>
+    <div class="color-schemes" id="color-schemes"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Actions</div>
+    <div class="actions">
+      <button class="action-btn primary" id="btn-pause">⏸ Pause</button>
+      <button class="action-btn" id="btn-clear">Clear</button>
+      <button class="action-btn" id="btn-seed">Seed</button>
+      <button class="action-btn" id="btn-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="canvas"></canvas>
+  <div class="stats" id="stats">FPS: --</div>
+  <div class="hint" id="hint">Click & drag to paint chemical B onto the simulation</div>
+</div>
+
+<script>
+const W = 256;
+const H = 256;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = W;
+canvas.height = H;
+
+const wrap = document.querySelector('.canvas-wrap');
+function fitCanvas() {
+  const maxW = wrap.clientWidth - 40;
+  const maxH = wrap.clientHeight - 40;
+  const scale = Math.min(maxW / W, maxH / H);
+  const s = Math.max(1, Math.floor(scale));
+  canvas.style.width = (W * s) + 'px';
+  canvas.style.height = (H * s) + 'px';
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+let gridA = new Float32Array(W * H);
+let gridB = new Float32Array(W * H);
+let nextA = new Float32Array(W * H);
+let nextB = new Float32Array(W * H);
+
+const imageData = ctx.createImageData(W, H);
+const pixels = imageData.data;
+
+let feed = 0.055;
+let kill = 0.062;
+let dA = 1.0;
+let dB = 0.5;
+let stepsPerFrame = 8;
+let paused = false;
+let brushRadius = 4;
+let activeScheme = 0;
+
+const presets = [
+  { name: 'Mitosis',   f: 0.028, k: 0.062 },
+  { name: 'Coral',     f: 0.055, k: 0.062 },
+  { name: 'Ripples',   f: 0.012, k: 0.050 },
+  { name: 'Maze',      f: 0.029, k: 0.057 },
+  { name: 'Spots',     f: 0.030, k: 0.062 },
+  { name: 'Worms',     f: 0.078, k: 0.061 },
+  { name: 'Holes',     f: 0.039, k: 0.058 },
+  { name: 'Chaos',     f: 0.026, k: 0.051 },
+  { name: 'Solitons',  f: 0.030, k: 0.056 },
+  { name: 'Pulsing',   f: 0.025, k: 0.060 },
+];
+
+const colorSchemes = [
+  { name: 'Plasma',    fn: (a, b) => { const v = b; return [v*255, v*80, 255-v*200, 255]; }},
+  { name: 'Ocean',     fn: (a, b) => { return [b*30, b*100+50, 180+b*75, 255]; }},
+  { name: 'Lava',      fn: (a, b) => { return [255*b, 60*b, 10*b*b, 255]; }},
+  { name: 'Forest',    fn: (a, b) => { return [b*40, 80+b*175, b*60, 255]; }},
+  { name: 'Neon',      fn: (a, b) => { return [b*255, b*50, 255-b*100, 255]; }},
+  { name: 'Mono',      fn: (a, b) => { const v = b*255; return [v, v, v, 255]; }},
+  { name: 'Sunset',    fn: (a, b) => { return [220*b+35, 80*b, 180-b*160, 255]; }},
+  { name: 'Ice',       fn: (a, b) => { return [180*b, 220*b+35, 255, 255]; }},
+];
+
+const brushSizes = [2, 4, 8, 14];
+
+function init() {
+  gridA.fill(1);
+  gridB.fill(0);
+  seed();
+}
+
+function seed() {
+  const cx = W / 2, cy = H / 2;
+  for (let i = 0; i < 20; i++) {
+    const sx = cx + (Math.random() - 0.5) * W * 0.6;
+    const sy = cy + (Math.random() - 0.5) * H * 0.6;
+    const r = 3 + Math.random() * 5;
+    paintB(sx, sy, r);
+  }
+}
+
+function paintB(cx, cy, r) {
+  for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+    for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      const dx = x - cx, dy = y - cy;
+      if (dx * dx + dy * dy <= r * r) {
+        const wx = ((x % W) + W) % W;
+        const wy = ((y % H) + H) % H;
+        const idx = wy * W + wx;
+        gridB[idx] = 1;
+      }
+    }
+  }
+}
+
+function laplacian(grid, x, y) {
+  const idx = y * W + x;
+  const l = x === 0 ? W - 1 : x - 1;
+  const r = x === W - 1 ? 0 : x + 1;
+  const u = y === 0 ? H - 1 : y - 1;
+  const d = y === H - 1 ? 0 : y + 1;
+
+  return grid[u * W + l] * 0.05
+       + grid[u * W + x] * 0.2
+       + grid[u * W + r] * 0.05
+       + grid[y * W + l] * 0.2
+       - grid[idx]
+       + grid[y * W + r] * 0.2
+       + grid[d * W + l] * 0.05
+       + grid[d * W + x] * 0.2
+       + grid[d * W + r] * 0.05;
+}
+
+function step() {
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = y * W + x;
+      const a = gridA[idx];
+      const b = gridB[idx];
+      const la = laplacian(gridA, x, y);
+      const lb = laplacian(gridB, x, y);
+      const abb = a * b * b;
+
+      nextA[idx] = a + (dA * la - abb + feed * (1 - a));
+      nextB[idx] = b + (dB * lb + abb - (kill + feed) * b);
+
+      nextA[idx] = Math.max(0, Math.min(1, nextA[idx]));
+      nextB[idx] = Math.max(0, Math.min(1, nextB[idx]));
+    }
+  }
+  [gridA, nextA] = [nextA, gridA];
+  [gridB, nextB] = [nextB, gridB];
+}
+
+function render() {
+  const scheme = colorSchemes[activeScheme].fn;
+  for (let i = 0; i < W * H; i++) {
+    const c = scheme(gridA[i], gridB[i]);
+    const pi = i * 4;
+    pixels[pi] = c[0];
+    pixels[pi + 1] = c[1];
+    pixels[pi + 2] = c[2];
+    pixels[pi + 3] = c[3];
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+let lastTime = performance.now();
+let frameCount = 0;
+const statsEl = document.getElementById('stats');
+
+function loop(now) {
+  requestAnimationFrame(loop);
+
+  if (!paused) {
+    for (let i = 0; i < stepsPerFrame; i++) step();
+  }
+  render();
+
+  frameCount++;
+  if (now - lastTime >= 1000) {
+    statsEl.textContent = `FPS: ${frameCount} · ${W}×${H}`;
+    frameCount = 0;
+    lastTime = now;
+  }
+}
+
+// UI setup
+const presetsEl = document.getElementById('presets');
+presets.forEach((p, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'preset-btn';
+  btn.textContent = p.name;
+  btn.addEventListener('click', () => {
+    feed = p.f;
+    kill = p.k;
+    document.getElementById('feed').value = feed;
+    document.getElementById('kill').value = kill;
+    document.getElementById('feed-val').textContent = feed.toFixed(3);
+    document.getElementById('kill-val').textContent = kill.toFixed(3);
+    presetsEl.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+  if (i === 1) btn.classList.add('active');
+  presetsEl.appendChild(btn);
+});
+
+const brushEl = document.getElementById('brush-sizes');
+brushSizes.forEach(s => {
+  const btn = document.createElement('div');
+  btn.className = 'brush-size' + (s === brushRadius ? ' active' : '');
+  const dot = document.createElement('div');
+  dot.className = 'brush-dot';
+  const ds = Math.max(4, s);
+  dot.style.width = ds + 'px';
+  dot.style.height = ds + 'px';
+  btn.appendChild(dot);
+  btn.addEventListener('click', () => {
+    brushRadius = s;
+    brushEl.querySelectorAll('.brush-size').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+  brushEl.appendChild(btn);
+});
+
+const schemesEl = document.getElementById('color-schemes');
+colorSchemes.forEach((s, i) => {
+  const swatch = document.createElement('div');
+  swatch.className = 'color-swatch' + (i === 0 ? ' active' : '');
+  const grad = [];
+  for (let t = 0; t <= 1; t += 0.25) {
+    const c = s.fn(1 - t, t);
+    grad.push(`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`);
+  }
+  swatch.style.background = `linear-gradient(135deg, ${grad.join(', ')})`;
+  swatch.title = s.name;
+  swatch.addEventListener('click', () => {
+    activeScheme = i;
+    schemesEl.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    swatch.classList.add('active');
+  });
+  schemesEl.appendChild(swatch);
+});
+
+['feed', 'kill', 'da', 'db', 'speed'].forEach(id => {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(id + '-val');
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    if (id === 'feed') { feed = v; valEl.textContent = v.toFixed(3); }
+    if (id === 'kill') { kill = v; valEl.textContent = v.toFixed(3); }
+    if (id === 'da') { dA = v; valEl.textContent = v.toFixed(2); }
+    if (id === 'db') { dB = v; valEl.textContent = v.toFixed(2); }
+    if (id === 'speed') { stepsPerFrame = v; valEl.textContent = v; }
+    if (id === 'feed' || id === 'kill') {
+      presetsEl.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    }
+  });
+});
+
+document.getElementById('btn-pause').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '▶ Play' : '⏸ Pause';
+  this.classList.toggle('primary', !paused);
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  gridA.fill(1);
+  gridB.fill(0);
+});
+
+document.getElementById('btn-seed').addEventListener('click', () => {
+  seed();
+});
+
+document.getElementById('btn-save').addEventListener('click', () => {
+  const link = document.createElement('a');
+  const saveCanvas = document.createElement('canvas');
+  saveCanvas.width = W * 2;
+  saveCanvas.height = H * 2;
+  const sctx = saveCanvas.getContext('2d');
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(canvas, 0, 0, W * 2, H * 2);
+  link.download = 'reaction-diffusion.png';
+  link.href = saveCanvas.toDataURL();
+  link.click();
+});
+
+// Mouse painting
+let painting = false;
+
+function getSimCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  painting = true;
+  const { x, y } = getSimCoords(e);
+  paintB(x, y, brushRadius);
+  document.getElementById('hint').style.opacity = '0';
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!painting) return;
+  const { x, y } = getSimCoords(e);
+  paintB(x, y, brushRadius);
+});
+
+canvas.addEventListener('mouseup', () => painting = false);
+canvas.addEventListener('mouseleave', () => painting = false);
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  painting = true;
+  const t = e.touches[0];
+  const { x, y } = getSimCoords(t);
+  paintB(x, y, brushRadius);
+  document.getElementById('hint').style.opacity = '0';
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!painting) return;
+  const t = e.touches[0];
+  const { x, y } = getSimCoords(t);
+  paintB(x, y, brushRadius);
+});
+
+canvas.addEventListener('touchend', () => painting = false);
+
+init();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
