@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falling Sand Simulator</title>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --accent: #e8a44a;
+    --accent2: #d4785a;
+    --text: #e8e8f0;
+    --muted: #7a7a8c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  header {
+    padding: 24px 20px 16px;
+    text-align: center;
+    width: 100%;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 4px;
+  }
+
+  .app-container {
+    display: flex;
+    gap: 16px;
+    padding: 0 20px 20px;
+    max-width: 1200px;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .canvas-wrapper {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  canvas {
+    display: block;
+    cursor: crosshair;
+    image-rendering: pixelated;
+  }
+
+  .toolbar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 220px;
+    flex-shrink: 0;
+  }
+
+  .toolbar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toolbar-section h3 {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .material-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .material-btn {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 4px;
+    color: var(--text);
+    font-size: 0.68rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    text-align: center;
+  }
+
+  .material-btn .swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .material-btn:hover {
+    border-color: var(--accent);
+    background: rgba(232, 164, 74, 0.1);
+  }
+
+  .material-btn.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(232, 164, 74, 0.3);
+  }
+
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .slider-group label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .slider-group label span {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .action-btns {
+    display: flex;
+    gap: 6px;
+  }
+
+  .action-btn {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .action-btn:hover {
+    border-color: var(--accent);
+    background: rgba(232, 164, 74, 0.1);
+  }
+
+  .action-btn.danger:hover {
+    border-color: #e85a5a;
+    background: rgba(232, 90, 90, 0.1);
+  }
+
+  .stats {
+    font-size: 0.68rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stats span { color: var(--accent); font-weight: 600; }
+
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .preset-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 4px;
+    color: var(--text);
+    font-size: 0.65rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .preset-btn:hover {
+    border-color: var(--accent);
+    background: rgba(232, 164, 74, 0.1);
+  }
+
+  .keyhint {
+    font-size: 0.65rem;
+    color: var(--muted);
+    line-height: 1.5;
+    opacity: 0.7;
+  }
+
+  .brush-preview {
+    position: fixed;
+    pointer-events: none;
+    border: 1px solid rgba(232, 164, 74, 0.6);
+    border-radius: 50%;
+    z-index: 100;
+    display: none;
+  }
+
+  @media (max-width: 800px) {
+    .app-container { flex-direction: column; align-items: center; }
+    .toolbar { width: 100%; max-width: 500px; flex-direction: row; flex-wrap: wrap; }
+    .toolbar-section { min-width: 180px; flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Falling Sand Simulator</h1>
+  <div class="subtitle">Place materials and watch physics unfold</div>
+</header>
+
+<div class="app-container">
+  <div class="canvas-wrapper">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-section">
+      <h3>Materials</h3>
+      <div class="material-grid" id="material-grid"></div>
+    </div>
+
+    <div class="toolbar-section">
+      <h3>Brush</h3>
+      <div class="slider-group">
+        <label>Size <span id="brush-val">4</span></label>
+        <input type="range" id="brush-size" min="1" max="20" value="4">
+      </div>
+    </div>
+
+    <div class="toolbar-section">
+      <h3>Simulation</h3>
+      <div class="action-btns">
+        <button class="action-btn" id="pause-btn">Pause</button>
+        <button class="action-btn danger" id="clear-btn">Clear</button>
+      </div>
+      <div class="slider-group">
+        <label>Speed <span id="speed-val">1x</span></label>
+        <input type="range" id="speed" min="1" max="5" value="1">
+      </div>
+    </div>
+
+    <div class="toolbar-section">
+      <h3>Presets</h3>
+      <div class="preset-grid" id="preset-grid"></div>
+    </div>
+
+    <div class="toolbar-section">
+      <h3>Stats</h3>
+      <div class="stats">
+        <div>Particles: <span id="stat-particles">0</span></div>
+        <div>FPS: <span id="stat-fps">0</span></div>
+      </div>
+    </div>
+
+    <div class="toolbar-section">
+      <div class="keyhint">
+        1-0: Select material<br>
+        [ / ]: Brush size<br>
+        Space: Pause<br>
+        C: Clear
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="brush-preview" id="brush-preview"></div>
+
+<script>
+const EMPTY = 0;
+const SAND = 1;
+const WATER = 2;
+const STONE = 3;
+const FIRE = 4;
+const WOOD = 5;
+const OIL = 6;
+const ACID = 7;
+const LAVA = 8;
+const PLANT = 9;
+const SMOKE = 10;
+const STEAM = 11;
+const GUNPOWDER = 12;
+
+const MATERIALS = [
+  { id: SAND,      name: 'Sand',      color: [210, 180, 100], key: '1' },
+  { id: WATER,     name: 'Water',     color: [40, 100, 220],  key: '2' },
+  { id: STONE,     name: 'Stone',     color: [130, 130, 140], key: '3' },
+  { id: FIRE,      name: 'Fire',      color: [255, 120, 20],  key: '4' },
+  { id: WOOD,      name: 'Wood',      color: [120, 80, 40],   key: '5' },
+  { id: OIL,       name: 'Oil',       color: [60, 50, 30],    key: '6' },
+  { id: ACID,      name: 'Acid',      color: [80, 240, 60],   key: '7' },
+  { id: LAVA,      name: 'Lava',      color: [220, 60, 20],   key: '8' },
+  { id: PLANT,     name: 'Plant',     color: [30, 160, 50],   key: '9' },
+  { id: GUNPOWDER, name: 'Powder',    color: [70, 70, 75],    key: '0' },
+  { id: SMOKE,     name: 'Smoke',     color: [80, 80, 90],    key: '-' },
+  { id: STEAM,     name: 'Steam',     color: [180, 200, 220], key: '=' },
+];
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const PIXEL_SIZE = 3;
+let COLS, ROWS;
+let grid, nextGrid, colorGrid;
+let paused = false;
+let speed = 1;
+let brushSize = 4;
+let selectedMaterial = SAND;
+let mouseDown = false;
+let mouseX = 0, mouseY = 0;
+let frameCount = 0;
+let lastFpsTime = performance.now();
+let fps = 0;
+let particleCount = 0;
+let tick = 0;
+
+function initCanvas() {
+  const maxW = Math.min(window.innerWidth - 280, 600);
+  const maxH = Math.min(window.innerHeight - 120, 500);
+  COLS = Math.floor(maxW / PIXEL_SIZE);
+  ROWS = Math.floor(maxH / PIXEL_SIZE);
+  canvas.width = COLS * PIXEL_SIZE;
+  canvas.height = ROWS * PIXEL_SIZE;
+  grid = new Uint8Array(COLS * ROWS);
+  nextGrid = new Uint8Array(COLS * ROWS);
+  colorGrid = new Uint8Array(COLS * ROWS * 3);
+}
+
+function idx(x, y) { return y * COLS + x; }
+function inBounds(x, y) { return x >= 0 && x < COLS && y >= 0 && y < ROWS; }
+function get(x, y) { return inBounds(x, y) ? grid[idx(x, y)] : STONE; }
+function getNext(x, y) { return inBounds(x, y) ? nextGrid[idx(x, y)] : STONE; }
+
+function setCell(x, y, type) {
+  if (!inBounds(x, y)) return;
+  const i = idx(x, y);
+  nextGrid[i] = type;
+  const c = variantColor(type, x, y);
+  colorGrid[i * 3] = c[0];
+  colorGrid[i * 3 + 1] = c[1];
+  colorGrid[i * 3 + 2] = c[2];
+}
+
+function variantColor(type, x, y) {
+  const hash = ((x * 7919 + y * 6271 + tick * 3) & 0xFFFF) / 65536;
+  const v = (hash - 0.5) * 30;
+  switch (type) {
+    case SAND: return [210 + v, 180 + v * 0.8, 100 + v * 0.5];
+    case WATER: {
+      const wave = Math.sin(x * 0.1 + tick * 0.05) * 10;
+      return [40 + wave, 100 + wave, 220 + v * 0.3];
+    }
+    case STONE: return [130 + v * 0.5, 130 + v * 0.5, 140 + v * 0.5];
+    case FIRE: {
+      const flicker = Math.random() * 60;
+      return [255, 80 + flicker, 10 + Math.random() * 30];
+    }
+    case WOOD: return [120 + v * 0.5, 80 + v * 0.3, 40 + v * 0.2];
+    case OIL: return [60 + v * 0.3, 50 + v * 0.3, 30 + v * 0.2];
+    case ACID: {
+      const pulse = Math.sin(tick * 0.1 + x * 0.2) * 20;
+      return [80 + pulse, 240, 60 + pulse];
+    }
+    case LAVA: {
+      const glow = Math.sin(tick * 0.08 + x * 0.1 + y * 0.1) * 30;
+      return [220 + glow, 60 + glow * 0.5, 20];
+    }
+    case PLANT: return [30 + v * 0.3, 140 + v, 50 + v * 0.3];
+    case GUNPOWDER: return [70 + v * 0.3, 70 + v * 0.3, 75 + v * 0.3];
+    case SMOKE: {
+      const fade = 80 + v * 0.5;
+      return [fade, fade, fade + 10];
+    }
+    case STEAM: {
+      const bright = 180 + v;
+      return [bright, bright + 20, bright + 40];
+    }
+    default: return [0, 0, 0];
+  }
+}
+
+function isEmpty(x, y) { return get(x, y) === EMPTY; }
+function isNextEmpty(x, y) { return getNext(x, y) === EMPTY; }
+function isLiquid(t) { return t === WATER || t === OIL || t === ACID || t === LAVA; }
+function isGas(t) { return t === SMOKE || t === STEAM; }
+function isFlammable(t) { return t === WOOD || t === OIL || t === PLANT || t === GUNPOWDER; }
+function isSolid(t) { return t === STONE || t === WOOD || t === PLANT; }
+
+function swapNext(x1, y1, x2, y2) {
+  const i1 = idx(x1, y1), i2 = idx(x2, y2);
+  const tmp = nextGrid[i1];
+  nextGrid[i1] = nextGrid[i2];
+  nextGrid[i2] = tmp;
+  for (let c = 0; c < 3; c++) {
+    const t = colorGrid[i1 * 3 + c];
+    colorGrid[i1 * 3 + c] = colorGrid[i2 * 3 + c];
+    colorGrid[i2 * 3 + c] = t;
+  }
+}
+
+function updateSand(x, y) {
+  const below = getNext(x, y + 1);
+  if (below === EMPTY) {
+    swapNext(x, y, x, y + 1);
+  } else if (isLiquid(below)) {
+    swapNext(x, y, x, y + 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const bl = getNext(x + dir, y + 1);
+    const br = getNext(x - dir, y + 1);
+    if (bl === EMPTY || isLiquid(bl)) {
+      swapNext(x, y, x + dir, y + 1);
+    } else if (br === EMPTY || isLiquid(br)) {
+      swapNext(x, y, x - dir, y + 1);
+    }
+  }
+}
+
+function updateWater(x, y) {
+  const below = getNext(x, y + 1);
+  if (below === EMPTY) {
+    swapNext(x, y, x, y + 1);
+  } else if (below === OIL) {
+    swapNext(x, y, x, y + 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const bl = getNext(x + dir, y + 1);
+    const br = getNext(x - dir, y + 1);
+    if (bl === EMPTY) {
+      swapNext(x, y, x + dir, y + 1);
+    } else if (br === EMPTY) {
+      swapNext(x, y, x - dir, y + 1);
+    } else {
+      const spread = 2 + Math.floor(Math.random() * 3);
+      for (let d = 1; d <= spread; d++) {
+        if (getNext(x + dir * d, y) === EMPTY) {
+          swapNext(x, y, x + dir * d, y);
+          return;
+        }
+        if (getNext(x + dir * d, y) !== WATER) break;
+      }
+      for (let d = 1; d <= spread; d++) {
+        if (getNext(x - dir * d, y) === EMPTY) {
+          swapNext(x, y, x - dir * d, y);
+          return;
+        }
+        if (getNext(x - dir * d, y) !== WATER) break;
+      }
+    }
+  }
+}
+
+function updateOil(x, y) {
+  const below = getNext(x, y + 1);
+  if (below === EMPTY) {
+    swapNext(x, y, x, y + 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (getNext(x + dir, y + 1) === EMPTY) {
+      swapNext(x, y, x + dir, y + 1);
+    } else if (getNext(x - dir, y + 1) === EMPTY) {
+      swapNext(x, y, x - dir, y + 1);
+    } else {
+      for (let d = 1; d <= 3; d++) {
+        if (getNext(x + dir * d, y) === EMPTY) {
+          swapNext(x, y, x + dir * d, y);
+          return;
+        }
+        if (getNext(x + dir * d, y) !== OIL) break;
+      }
+    }
+  }
+}
+
+function updateAcid(x, y) {
+  const below = getNext(x, y + 1);
+  if (below === EMPTY) {
+    swapNext(x, y, x, y + 1);
+  } else if (below !== ACID && below !== EMPTY && below !== STONE) {
+    if (Math.random() < 0.3) {
+      setCell(x, y + 1, EMPTY);
+      if (Math.random() < 0.5) setCell(x, y, SMOKE);
+      else setCell(x, y, EMPTY);
+      return;
+    }
+  }
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  const sideType = getNext(x + dir, y);
+  if (sideType !== EMPTY && sideType !== ACID && sideType !== STONE && Math.random() < 0.15) {
+    setCell(x + dir, y, EMPTY);
+    if (Math.random() < 0.4) setCell(x, y, SMOKE);
+    else setCell(x, y, EMPTY);
+    return;
+  }
+  if (getNext(x + dir, y + 1) === EMPTY) {
+    swapNext(x, y, x + dir, y + 1);
+  } else if (getNext(x - dir, y + 1) === EMPTY) {
+    swapNext(x, y, x - dir, y + 1);
+  } else {
+    for (let d = 1; d <= 2; d++) {
+      if (getNext(x + dir * d, y) === EMPTY) {
+        swapNext(x, y, x + dir * d, y);
+        return;
+      }
+    }
+  }
+}
+
+function updateFire(x, y) {
+  if (Math.random() < 0.12) {
+    setCell(x, y, SMOKE);
+    return;
+  }
+  if (Math.random() < 0.08) {
+    setCell(x, y, EMPTY);
+    return;
+  }
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = x + dx, ny = y + dy;
+      const neighbor = getNext(nx, ny);
+      if (neighbor === WATER) {
+        setCell(x, y, STEAM);
+        setCell(nx, ny, STEAM);
+        return;
+      }
+      if (isFlammable(neighbor) && Math.random() < 0.08) {
+        setCell(nx, ny, FIRE);
+      }
+      if (neighbor === GUNPOWDER && Math.random() < 0.6) {
+        setCell(nx, ny, FIRE);
+        for (let ex = -2; ex <= 2; ex++) {
+          for (let ey = -2; ey <= 2; ey++) {
+            if (inBounds(nx + ex, ny + ey) && Math.random() < 0.5) {
+              const t = getNext(nx + ex, ny + ey);
+              if (t !== STONE) setCell(nx + ex, ny + ey, FIRE);
+            }
+          }
+        }
+      }
+    }
+  }
+  if (getNext(x, y - 1) === EMPTY && Math.random() < 0.4) {
+    swapNext(x, y, x, y - 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (getNext(x + dir, y - 1) === EMPTY && Math.random() < 0.3) {
+      swapNext(x, y, x + dir, y - 1);
+    }
+  }
+}
+
+function updateLava(x, y) {
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = x + dx, ny = y + dy;
+      const neighbor = getNext(nx, ny);
+      if (neighbor === WATER) {
+        setCell(nx, ny, STONE);
+        setCell(x, y, STONE);
+        return;
+      }
+      if (isFlammable(neighbor) && Math.random() < 0.15) {
+        setCell(nx, ny, FIRE);
+      }
+    }
+  }
+  const below = getNext(x, y + 1);
+  if (below === EMPTY) {
+    swapNext(x, y, x, y + 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (getNext(x + dir, y + 1) === EMPTY) {
+      swapNext(x, y, x + dir, y + 1);
+    } else if (getNext(x - dir, y + 1) === EMPTY) {
+      swapNext(x, y, x - dir, y + 1);
+    } else if (Math.random() < 0.3) {
+      if (getNext(x + dir, y) === EMPTY) {
+        swapNext(x, y, x + dir, y);
+      }
+    }
+  }
+  if (Math.random() < 0.005) setCell(x, y, STONE);
+}
+
+function updateSmoke(x, y) {
+  if (Math.random() < 0.02) {
+    setCell(x, y, EMPTY);
+    return;
+  }
+  if (getNext(x, y - 1) === EMPTY) {
+    swapNext(x, y, x, y - 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (getNext(x + dir, y - 1) === EMPTY) {
+      swapNext(x, y, x + dir, y - 1);
+    } else if (getNext(x - dir, y - 1) === EMPTY) {
+      swapNext(x, y, x - dir, y - 1);
+    } else if (getNext(x + dir, y) === EMPTY && Math.random() < 0.5) {
+      swapNext(x, y, x + dir, y);
+    }
+  }
+}
+
+function updateSteam(x, y) {
+  if (Math.random() < 0.015) {
+    setCell(x, y, EMPTY);
+    return;
+  }
+  if (y <= 1 && Math.random() < 0.05) {
+    setCell(x, y, EMPTY);
+    return;
+  }
+  if (Math.random() < 0.003) {
+    setCell(x, y, WATER);
+    return;
+  }
+  if (getNext(x, y - 1) === EMPTY) {
+    swapNext(x, y, x, y - 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (getNext(x + dir, y - 1) === EMPTY) {
+      swapNext(x, y, x + dir, y - 1);
+    } else if (getNext(x + dir, y) === EMPTY) {
+      swapNext(x, y, x + dir, y);
+    }
+  }
+}
+
+function updatePlant(x, y) {
+  const hasWater = (
+    getNext(x - 1, y) === WATER || getNext(x + 1, y) === WATER ||
+    getNext(x, y - 1) === WATER || getNext(x, y + 1) === WATER
+  );
+  if (hasWater && Math.random() < 0.03) {
+    const dirs = [[0, -1], [-1, 0], [1, 0], [0, 1]];
+    const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
+    const nx = x + dx, ny = y + dy;
+    if (getNext(nx, ny) === WATER) {
+      setCell(nx, ny, PLANT);
+    }
+  }
+}
+
+function updateGunpowder(x, y) {
+  const below = getNext(x, y + 1);
+  if (below === EMPTY) {
+    swapNext(x, y, x, y + 1);
+  } else if (isLiquid(below)) {
+    swapNext(x, y, x, y + 1);
+  } else {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (getNext(x + dir, y + 1) === EMPTY) {
+      swapNext(x, y, x + dir, y + 1);
+    } else if (getNext(x - dir, y + 1) === EMPTY) {
+      swapNext(x, y, x - dir, y + 1);
+    }
+  }
+}
+
+function simulate() {
+  nextGrid.set(grid);
+  tick++;
+
+  const scanDown = tick % 2 === 0;
+
+  for (let y = scanDown ? ROWS - 1 : 0; scanDown ? y >= 0 : y < ROWS; scanDown ? y-- : y++) {
+    const leftToRight = Math.random() < 0.5;
+    for (let x = leftToRight ? 0 : COLS - 1; leftToRight ? x < COLS : x >= 0; leftToRight ? x++ : x--) {
+      const type = nextGrid[idx(x, y)];
+      if (type === EMPTY || type === STONE) continue;
+
+      switch (type) {
+        case SAND: updateSand(x, y); break;
+        case WATER: updateWater(x, y); break;
+        case FIRE: updateFire(x, y); break;
+        case WOOD: break;
+        case OIL: updateOil(x, y); break;
+        case ACID: updateAcid(x, y); break;
+        case LAVA: updateLava(x, y); break;
+        case PLANT: updatePlant(x, y); break;
+        case GUNPOWDER: updateGunpowder(x, y); break;
+        case SMOKE: updateSmoke(x, y); break;
+        case STEAM: updateSteam(x, y); break;
+      }
+    }
+  }
+
+  grid.set(nextGrid);
+}
+
+function render() {
+  const imageData = ctx.createImageData(canvas.width, canvas.height);
+  const data = imageData.data;
+  let count = 0;
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = idx(x, y);
+      const type = grid[i];
+      if (type !== EMPTY) count++;
+
+      const r = type === EMPTY ? 13 : colorGrid[i * 3];
+      const g = type === EMPTY ? 13 : colorGrid[i * 3 + 1];
+      const b = type === EMPTY ? 15 : colorGrid[i * 3 + 2];
+
+      for (let py = 0; py < PIXEL_SIZE; py++) {
+        for (let px = 0; px < PIXEL_SIZE; px++) {
+          const di = ((y * PIXEL_SIZE + py) * canvas.width + x * PIXEL_SIZE + px) * 4;
+          data[di] = r;
+          data[di + 1] = g;
+          data[di + 2] = b;
+          data[di + 3] = 255;
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  particleCount = count;
+}
+
+function placeMaterial(cx, cy) {
+  const gx = Math.floor(cx / PIXEL_SIZE);
+  const gy = Math.floor(cy / PIXEL_SIZE);
+  const r = brushSize;
+
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const nx = gx + dx, ny = gy + dy;
+      if (!inBounds(nx, ny)) continue;
+
+      if (selectedMaterial === EMPTY || get(nx, ny) === EMPTY || selectedMaterial === EMPTY) {
+        if (selectedMaterial === EMPTY || Math.random() < 0.7) {
+          const i = idx(nx, ny);
+          grid[i] = selectedMaterial;
+          const c = variantColor(selectedMaterial, nx, ny);
+          colorGrid[i * 3] = c[0];
+          colorGrid[i * 3 + 1] = c[1];
+          colorGrid[i * 3 + 2] = c[2];
+        }
+      }
+    }
+  }
+}
+
+function buildUI() {
+  const matGrid = document.getElementById('material-grid');
+
+  const eraser = { id: EMPTY, name: 'Erase', color: [40, 40, 50], key: 'E' };
+  [eraser, ...MATERIALS].forEach(mat => {
+    const btn = document.createElement('button');
+    btn.className = 'material-btn' + (mat.id === selectedMaterial ? ' active' : '');
+    btn.dataset.id = mat.id;
+    btn.innerHTML = `<div class="swatch" style="background:rgb(${mat.color.join(',')})"></div>${mat.name}`;
+    btn.onclick = () => {
+      selectedMaterial = mat.id;
+      document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    matGrid.appendChild(btn);
+  });
+
+  const presets = [
+    { name: 'Hourglass', fn: presetHourglass },
+    { name: 'Volcano', fn: presetVolcano },
+    { name: 'Waterfall', fn: presetWaterfall },
+    { name: 'Garden', fn: presetGarden },
+    { name: 'Acid Rain', fn: presetAcidRain },
+    { name: 'Fireworks', fn: presetFireworks },
+  ];
+
+  const presetGrid = document.getElementById('preset-grid');
+  presets.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = p.name;
+    btn.onclick = () => { clearGrid(); p.fn(); };
+    presetGrid.appendChild(btn);
+  });
+}
+
+function clearGrid() {
+  grid.fill(0);
+  nextGrid.fill(0);
+  colorGrid.fill(0);
+}
+
+function presetHourglass() {
+  const cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const dx = x - cx, dy = y - cy;
+      const w = Math.abs(dy) * 0.6 + 5;
+      if (Math.abs(dx) < w && Math.abs(dx) >= w - 2) {
+        const i = idx(x, y);
+        grid[i] = STONE;
+        const c = variantColor(STONE, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+      if (y < cy - 5 && Math.abs(dx) < Math.abs(y - cy) * 0.6 + 3 && Math.random() < 0.7) {
+        const i = idx(x, y);
+        grid[i] = SAND;
+        const c = variantColor(SAND, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+    }
+  }
+}
+
+function presetVolcano() {
+  const cx = Math.floor(COLS / 2);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const dist = Math.abs(x - cx);
+      const slope = (ROWS - y) * 0.7;
+      if (dist < slope && dist > slope - 4 && y > ROWS * 0.4) {
+        const i = idx(x, y);
+        grid[i] = STONE;
+        const c = variantColor(STONE, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+      if (dist < 4 && y > ROWS * 0.35 && y < ROWS * 0.45) {
+        const i = idx(x, y);
+        grid[i] = LAVA;
+        const c = variantColor(LAVA, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+    }
+  }
+}
+
+function presetWaterfall() {
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (y === Math.floor(ROWS * 0.3) && (x < COLS * 0.35 || x > COLS * 0.65)) {
+        const i = idx(x, y);
+        grid[i] = STONE;
+        const c = variantColor(STONE, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+      if (y < Math.floor(ROWS * 0.3) && y > Math.floor(ROWS * 0.15) &&
+          x > COLS * 0.3 && x < COLS * 0.7 && Math.random() < 0.6) {
+        const i = idx(x, y);
+        grid[i] = WATER;
+        const c = variantColor(WATER, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+      if (y === ROWS - 1) {
+        const i = idx(x, y);
+        grid[i] = STONE;
+        const c = variantColor(STONE, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+    }
+  }
+}
+
+function presetGarden() {
+  for (let x = 0; x < COLS; x++) {
+    for (let y = ROWS - 1; y > ROWS - 6; y--) {
+      const i = idx(x, y);
+      grid[i] = SAND;
+      const c = variantColor(SAND, x, y);
+      colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+    }
+  }
+  for (let t = 0; t < 5; t++) {
+    const tx = Math.floor(COLS * 0.15 + t * COLS * 0.17);
+    for (let y = ROWS - 6; y > ROWS - 20 - Math.random() * 10; y--) {
+      if (inBounds(tx, y)) {
+        const i = idx(tx, y);
+        grid[i] = PLANT;
+        const c = variantColor(PLANT, tx, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+    }
+  }
+  for (let x = 0; x < COLS; x++) {
+    for (let y = ROWS - 8; y > ROWS - 10; y--) {
+      if (Math.random() < 0.4 && inBounds(x, y)) {
+        const i = idx(x, y);
+        grid[i] = WATER;
+        const c = variantColor(WATER, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+    }
+  }
+}
+
+function presetAcidRain() {
+  for (let x = 0; x < COLS; x++) {
+    for (let y = ROWS - 1; y > ROWS - 8; y--) {
+      const i = idx(x, y);
+      grid[i] = STONE;
+      const c = variantColor(STONE, x, y);
+      colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+    }
+  }
+  for (let t = 0; t < 8; t++) {
+    const bx = Math.floor(COLS * 0.1 + t * COLS * 0.11);
+    for (let dy = 0; dy < 15; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        const x = bx + dx, y = ROWS - 8 - dy;
+        if (inBounds(x, y)) {
+          const i = idx(x, y);
+          grid[i] = WOOD;
+          const c = variantColor(WOOD, x, y);
+          colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+        }
+      }
+    }
+  }
+  for (let x = 0; x < COLS; x++) {
+    if (Math.random() < 0.15) {
+      for (let y = 0; y < 3; y++) {
+        const i = idx(x, y);
+        grid[i] = ACID;
+        const c = variantColor(ACID, x, y);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+    }
+  }
+}
+
+function presetFireworks() {
+  for (let x = 0; x < COLS; x++) {
+    const i = idx(x, ROWS - 1);
+    grid[i] = STONE;
+    const c = variantColor(STONE, x, ROWS - 1);
+    colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+  }
+  for (let t = 0; t < 6; t++) {
+    const bx = Math.floor(COLS * 0.1 + t * COLS * 0.16);
+    for (let dy = 0; dy < 20 + Math.random() * 15; dy++) {
+      if (inBounds(bx, ROWS - 2 - dy)) {
+        const i = idx(bx, ROWS - 2 - dy);
+        grid[i] = GUNPOWDER;
+        const c = variantColor(GUNPOWDER, bx, ROWS - 2 - dy);
+        colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+      }
+    }
+    if (inBounds(bx, ROWS - 2)) {
+      const i = idx(bx, ROWS - 2);
+      grid[i] = FIRE;
+      const c = variantColor(FIRE, bx, ROWS - 2);
+      colorGrid[i * 3] = c[0]; colorGrid[i * 3 + 1] = c[1]; colorGrid[i * 3 + 2] = c[2];
+    }
+  }
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  mouseDown = true;
+  const rect = canvas.getBoundingClientRect();
+  placeMaterial(e.clientX - rect.left, e.clientY - rect.top);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  if (mouseDown) {
+    placeMaterial(e.clientX - rect.left, e.clientY - rect.top);
+  }
+  const bp = document.getElementById('brush-preview');
+  bp.style.display = 'block';
+  const size = brushSize * PIXEL_SIZE * 2;
+  bp.style.width = size + 'px';
+  bp.style.height = size + 'px';
+  bp.style.left = (e.clientX - size / 2) + 'px';
+  bp.style.top = (e.clientY - size / 2) + 'px';
+});
+
+canvas.addEventListener('mouseup', () => { mouseDown = false; });
+canvas.addEventListener('mouseleave', () => {
+  mouseDown = false;
+  document.getElementById('brush-preview').style.display = 'none';
+});
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  mouseDown = true;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  placeMaterial(t.clientX - rect.left, t.clientY - rect.top);
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  if (mouseDown) placeMaterial(t.clientX - rect.left, t.clientY - rect.top);
+});
+
+canvas.addEventListener('touchend', () => { mouseDown = false; });
+
+document.getElementById('brush-size').addEventListener('input', (e) => {
+  brushSize = parseInt(e.target.value);
+  document.getElementById('brush-val').textContent = brushSize;
+});
+
+document.getElementById('speed').addEventListener('input', (e) => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speed-val').textContent = speed + 'x';
+});
+
+document.getElementById('pause-btn').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('pause-btn').textContent = paused ? 'Play' : 'Pause';
+});
+
+document.getElementById('clear-btn').addEventListener('click', clearGrid);
+
+document.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  if (key === ' ') {
+    e.preventDefault();
+    paused = !paused;
+    document.getElementById('pause-btn').textContent = paused ? 'Play' : 'Pause';
+  }
+  if (key === 'c') clearGrid();
+  if (key === '[') {
+    brushSize = Math.max(1, brushSize - 1);
+    document.getElementById('brush-size').value = brushSize;
+    document.getElementById('brush-val').textContent = brushSize;
+  }
+  if (key === ']') {
+    brushSize = Math.min(20, brushSize + 1);
+    document.getElementById('brush-size').value = brushSize;
+    document.getElementById('brush-val').textContent = brushSize;
+  }
+  if (key === 'e') {
+    selectedMaterial = EMPTY;
+    document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.material-btn[data-id="0"]').classList.add('active');
+  }
+  const matKey = MATERIALS.find(m => m.key === e.key);
+  if (matKey) {
+    selectedMaterial = matKey.id;
+    document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.material-btn[data-id="${matKey.id}"]`).classList.add('active');
+  }
+});
+
+function loop() {
+  if (!paused) {
+    for (let i = 0; i < speed; i++) simulate();
+  }
+  render();
+
+  frameCount++;
+  const now = performance.now();
+  if (now - lastFpsTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastFpsTime = now;
+    document.getElementById('stat-fps').textContent = fps;
+    document.getElementById('stat-particles').textContent = particleCount.toLocaleString();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+initCanvas();
+buildUI();
+loop();
+
+window.addEventListener('resize', () => {
+  const oldGrid = grid.slice();
+  const oldColors = colorGrid.slice();
+  const oldCols = COLS, oldRows = ROWS;
+  initCanvas();
+  for (let y = 0; y < Math.min(oldRows, ROWS); y++) {
+    for (let x = 0; x < Math.min(oldCols, COLS); x++) {
+      const oldI = y * oldCols + x;
+      const newI = idx(x, y);
+      grid[newI] = oldGrid[oldI];
+      colorGrid[newI * 3] = oldColors[oldI * 3];
+      colorGrid[newI * 3 + 1] = oldColors[oldI * 3 + 1];
+      colorGrid[newI * 3 + 2] = oldColors[oldI * 3 + 2];
+    }
+  }
+});
+</script>
+</body>
+</html>

@@ -30,6 +30,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "spirograph-generator", "-l", "3460"],
       "port": 3460
+    },
+    {
+      "name": "falling-sand",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "falling-sand", "-l", "3461"],
+      "port": 3461
     }
   ]
 }
