@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cellular Automata Lab</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a25;
+    --border: #2a2a3a;
+    --accent: #00e0a0;
+    --accent2: #7c6ff7;
+    --text: #e8e8f0;
+    --muted: #6a6a80;
+    --alive: #00e0a0;
+    --dead: #0e0e16;
+    --grid-line: #1a1a28;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    z-index: 10;
+  }
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    border-right: 1px solid var(--border);
+  }
+  .toolbar-group:last-child { border-right: none; }
+  .toolbar-group label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  button.danger:hover { border-color: #ff4466; color: #ff4466; }
+
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+
+  input[type="range"] {
+    width: 80px;
+    accent-color: var(--accent);
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .stats {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(10,10,15,0.85);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    backdrop-filter: blur(8px);
+  }
+  .stats span { color: var(--accent); font-weight: 600; }
+
+  .hint {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,10,15,0.8);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .pattern-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    z-index: 20;
+    min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .pattern-menu.open { display: block; }
+  .pattern-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+
+  .color-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    z-index: 20;
+    min-width: 160px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .color-menu.open { display: block; }
+  .color-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+
+  .dropdown-wrap { position: relative; }
+
+  @media (max-width: 700px) {
+    .toolbar { padding: 8px 10px; gap: 6px; }
+    .toolbar-group { padding: 0 4px; }
+    button { padding: 5px 8px; font-size: 0.72rem; }
+    .hint { font-size: 0.65rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="toolbar-group">
+    <button id="playBtn" class="active" title="Play/Pause (Space)">▶ Play</button>
+    <button id="stepBtn" title="Step (S)">⏭ Step</button>
+    <button id="clearBtn" class="danger" title="Clear (C)">✕ Clear</button>
+    <button id="randomBtn" title="Random (R)">⚄ Random</button>
+  </div>
+
+  <div class="toolbar-group">
+    <label>Speed</label>
+    <input type="range" id="speedSlider" min="1" max="60" value="15">
+  </div>
+
+  <div class="toolbar-group">
+    <label>Rule</label>
+    <select id="ruleSelect">
+      <option value="life" selected>Game of Life (B3/S23)</option>
+      <option value="highlife">HighLife (B36/S23)</option>
+      <option value="daynight">Day & Night (B3678/S34678)</option>
+      <option value="seeds">Seeds (B2/S)</option>
+      <option value="diamoeba">Diamoeba (B35678/S5678)</option>
+      <option value="maze">Maze (B3/S12345)</option>
+      <option value="anneal">Anneal (B4678/S35678)</option>
+      <option value="replicator">Replicator (B1357/S1357)</option>
+    </select>
+  </div>
+
+  <div class="toolbar-group dropdown-wrap">
+    <button id="patternBtn">📋 Patterns ▾</button>
+    <div class="pattern-menu" id="patternMenu">
+      <button data-pattern="glider">Glider</button>
+      <button data-pattern="lwss">Lightweight Spaceship</button>
+      <button data-pattern="hwss">Heavyweight Spaceship</button>
+      <button data-pattern="pulsar">Pulsar</button>
+      <button data-pattern="pentadecathlon">Pentadecathlon</button>
+      <button data-pattern="gosper">Gosper Glider Gun</button>
+      <button data-pattern="rpentomino">R-Pentomino</button>
+      <button data-pattern="acorn">Acorn</button>
+      <button data-pattern="diehard">Diehard</button>
+      <button data-pattern="block">Block (Still Life)</button>
+      <button data-pattern="beehive">Beehive (Still Life)</button>
+      <button data-pattern="blinker">Blinker (Oscillator)</button>
+    </div>
+  </div>
+
+  <div class="toolbar-group">
+    <label>Brush</label>
+    <select id="brushSize">
+      <option value="1">1×1</option>
+      <option value="3">3×3</option>
+      <option value="5">5×5</option>
+      <option value="9">9×9</option>
+    </select>
+  </div>
+
+  <div class="toolbar-group dropdown-wrap">
+    <button id="colorBtn">🎨 Theme ▾</button>
+    <div class="color-menu" id="colorMenu">
+      <button data-theme="emerald" class="active">Emerald</button>
+      <button data-theme="neon">Neon Purple</button>
+      <button data-theme="fire">Fire</button>
+      <button data-theme="ocean">Ocean</button>
+      <button data-theme="matrix">Matrix</button>
+      <button data-theme="sunset">Sunset</button>
+      <button data-theme="ice">Ice</button>
+      <button data-theme="heatmap">Heat Map (Age)</button>
+    </div>
+  </div>
+
+  <div class="toolbar-group">
+    <label><input type="checkbox" id="gridToggle" checked> Grid</label>
+    <label><input type="checkbox" id="wrapToggle" checked> Wrap</label>
+    <label><input type="checkbox" id="trailToggle"> Trails</label>
+  </div>
+</div>
+
+<div class="canvas-wrap" id="canvasWrap">
+  <canvas id="gridCanvas"></canvas>
+  <div class="stats" id="stats">
+    <div>Gen: <span id="genCount">0</span></div>
+    <div>Pop: <span id="popCount">0</span></div>
+    <div>FPS: <span id="fpsCount">0</span></div>
+  </div>
+  <div class="hint" id="hint">Click to draw · Right-click to erase · Scroll to zoom · Drag middle button to pan</div>
+</div>
+
+<script>
+const canvas = document.getElementById('gridCanvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+
+let CELL_SIZE = 8;
+let cols, rows;
+let grid, nextGrid, ageGrid;
+let generation = 0;
+let population = 0;
+let playing = false;
+let targetFPS = 15;
+let lastFrame = 0;
+let frameCount = 0;
+let lastFPSUpdate = 0;
+let currentFPS = 0;
+
+let panX = 0, panY = 0;
+let zoom = 1;
+let isPanning = false;
+let panStartX, panStartY;
+
+let isDrawing = false;
+let drawMode = 1;
+let brushSize = 1;
+let showGrid = true;
+let wrapEdges = true;
+let showTrails = false;
+let pendingPattern = null;
+
+const RULES = {
+  life:       { B: [3], S: [2,3] },
+  highlife:   { B: [3,6], S: [2,3] },
+  daynight:   { B: [3,6,7,8], S: [3,4,6,7,8] },
+  seeds:      { B: [2], S: [] },
+  diamoeba:   { B: [3,5,6,7,8], S: [5,6,7,8] },
+  maze:       { B: [3], S: [1,2,3,4,5] },
+  anneal:     { B: [4,6,7,8], S: [3,5,6,7,8] },
+  replicator: { B: [1,3,5,7], S: [1,3,5,7] },
+};
+let currentRule = RULES.life;
+
+const THEMES = {
+  emerald:  { alive: '#00e0a0', glow: '#00e0a040', dead: '#0e0e16', grid: '#1a1a28' },
+  neon:     { alive: '#b366ff', glow: '#b366ff40', dead: '#0e0e16', grid: '#1a1a28' },
+  fire:     { alive: '#ff6622', glow: '#ff662240', dead: '#0e0e16', grid: '#1a1a28' },
+  ocean:    { alive: '#22aaff', glow: '#22aaff40', dead: '#0e0e16', grid: '#1a1a28' },
+  matrix:   { alive: '#33ff33', glow: '#33ff3340', dead: '#050a05', grid: '#0a1a0a' },
+  sunset:   { alive: '#ff8844', glow: '#ff884440', dead: '#0e0e16', grid: '#1a1a28' },
+  ice:      { alive: '#88ddff', glow: '#88ddff40', dead: '#080812', grid: '#141428' },
+  heatmap:  { alive: null, glow: null, dead: '#0e0e16', grid: '#1a1a28' },
+};
+let currentTheme = THEMES.emerald;
+let currentThemeName = 'emerald';
+
+const PATTERNS = {
+  glider: [[0,1,0],[0,0,1],[1,1,1]],
+  lwss: [[0,1,0,0,1],[1,0,0,0,0],[1,0,0,0,1],[1,1,1,1,0]],
+  hwss: [[0,0,1,1,0,0],[1,0,0,0,0,1],[1,0,0,0,0,0],[1,0,0,0,0,0],[0,1,0,0,0,1],[0,0,1,1,1,1],[0,0,0,1,1,0]],
+  pulsar: (function(){
+    const p = Array.from({length:15},()=>Array(15).fill(0));
+    const pts = [[1,2],[1,8],[1,12],[2,1],[2,3],[2,7],[2,9],[2,11],[2,13],
+      [3,2],[3,8],[3,12],[6,2],[6,8],[6,12],[7,1],[7,3],[7,7],[7,9],[7,11],[7,13],
+      [8,2],[8,8],[8,12]];
+    for(const[r,c]of pts){p[r][c]=1;p[14-r][c]=1;p[r][14-c]=1;p[14-r][14-c]=1;}
+    return p;
+  })(),
+  pentadecathlon: (function(){
+    const p = Array.from({length:3},()=>Array(10).fill(1));
+    p[1][0]=0;p[1][3]=0;p[1][4]=0;p[1][5]=0;p[1][6]=0;p[1][9]=0;
+    return p;
+  })(),
+  gosper: (function(){
+    const p = Array.from({length:11},()=>Array(38).fill(0));
+    const cells = [[5,1],[5,2],[6,1],[6,2],[5,11],[6,11],[7,11],[4,12],[8,12],
+      [3,13],[9,13],[3,14],[9,14],[6,15],[4,16],[8,16],[5,17],[6,17],[7,17],
+      [6,18],[3,21],[4,21],[5,21],[3,22],[4,22],[5,22],[2,23],[6,23],[1,25],
+      [2,25],[6,25],[7,25],[3,35],[4,35],[3,36],[4,36]];
+    for(const[r,c]of cells) p[r][c]=1;
+    return p;
+  })(),
+  rpentomino: [[0,1,1],[1,1,0],[0,1,0]],
+  acorn: [[0,1,0,0,0,0,0],[0,0,0,1,0,0,0],[1,1,0,0,1,1,1]],
+  diehard: [[0,0,0,0,0,0,1,0],[1,1,0,0,0,0,0,0],[0,1,0,0,0,1,1,1]],
+  block: [[1,1],[1,1]],
+  beehive: [[0,1,1,0],[1,0,0,1],[0,1,1,0]],
+  blinker: [[1,1,1]],
+};
+
+function initGrid() {
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  canvas.width = w;
+  canvas.height = h;
+  cols = Math.ceil(w / (CELL_SIZE * zoom)) + 4;
+  rows = Math.ceil(h / (CELL_SIZE * zoom)) + 4;
+  const newGrid = new Uint8Array(cols * rows);
+  const newAge = new Uint16Array(cols * rows);
+  if (grid) {
+    const oc = Math.floor(grid.length / (rows || 1));
+    for (let y = 0; y < Math.min(rows, grid.length / oc); y++)
+      for (let x = 0; x < Math.min(cols, oc); x++) {
+        newGrid[y * cols + x] = grid[y * oc + x];
+        newAge[y * cols + x] = ageGrid[y * oc + x];
+      }
+  }
+  grid = newGrid;
+  nextGrid = new Uint8Array(cols * rows);
+  ageGrid = newAge;
+}
+
+function clearGrid() {
+  grid.fill(0);
+  ageGrid.fill(0);
+  generation = 0;
+  population = 0;
+}
+
+function randomize(density = 0.25) {
+  clearGrid();
+  for (let i = 0; i < grid.length; i++) {
+    grid[i] = Math.random() < density ? 1 : 0;
+  }
+}
+
+function countNeighbors(x, y) {
+  let count = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      let nx = x + dx, ny = y + dy;
+      if (wrapEdges) {
+        nx = (nx + cols) % cols;
+        ny = (ny + rows) % rows;
+      } else if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
+      count += grid[ny * cols + nx];
+    }
+  }
+  return count;
+}
+
+function step() {
+  let pop = 0;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const idx = y * cols + x;
+      const n = countNeighbors(x, y);
+      const alive = grid[idx];
+      if (alive) {
+        nextGrid[idx] = currentRule.S.includes(n) ? 1 : 0;
+      } else {
+        nextGrid[idx] = currentRule.B.includes(n) ? 1 : 0;
+      }
+      if (nextGrid[idx]) {
+        pop++;
+        ageGrid[idx] = alive ? Math.min(ageGrid[idx] + 1, 500) : 1;
+      } else if (!showTrails) {
+        ageGrid[idx] = 0;
+      } else {
+        ageGrid[idx] = ageGrid[idx] > 0 ? Math.max(ageGrid[idx] - 2, 0) : 0;
+      }
+    }
+  }
+  [grid, nextGrid] = [nextGrid, grid];
+  population = pop;
+  generation++;
+}
+
+function heatColor(age) {
+  const t = Math.min(age / 120, 1);
+  if (t < 0.25) return `rgb(${Math.floor(t*4*255)},0,${Math.floor(80+t*4*175)})`;
+  if (t < 0.5) return `rgb(255,${Math.floor((t-0.25)*4*200)},0)`;
+  if (t < 0.75) return `rgb(255,${Math.floor(200+(t-0.5)*4*55)},0)`;
+  return `rgb(255,255,${Math.floor((t-0.75)*4*255)})`;
+}
+
+function draw() {
+  const w = canvas.width, h = canvas.height;
+  ctx.fillStyle = currentTheme.dead;
+  ctx.fillRect(0, 0, w, h);
+
+  const cs = CELL_SIZE * zoom;
+  const offX = panX % cs;
+  const offY = panY % cs;
+  const startCol = Math.floor(-panX / cs);
+  const startRow = Math.floor(-panY / cs);
+  const endCol = startCol + Math.ceil(w / cs) + 1;
+  const endRow = startRow + Math.ceil(h / cs) + 1;
+
+  for (let y = startRow; y <= endRow; y++) {
+    for (let x = startCol; x <= endCol; x++) {
+      let gx = x, gy = y;
+      if (wrapEdges) {
+        gx = ((x % cols) + cols) % cols;
+        gy = ((y % rows) + rows) % rows;
+      } else if (x < 0 || x >= cols || y < 0 || y >= rows) continue;
+
+      const idx = gy * cols + gx;
+      const alive = grid[idx];
+      const age = ageGrid[idx];
+
+      if (alive || (showTrails && age > 0)) {
+        const px = (x - startCol) * cs + offX;
+        const py = (y - startRow) * cs + offY;
+
+        if (currentThemeName === 'heatmap') {
+          ctx.fillStyle = heatColor(age);
+        } else if (showTrails && !alive && age > 0) {
+          const alpha = Math.min(age / 60, 0.5);
+          ctx.fillStyle = currentTheme.alive + Math.floor(alpha * 255).toString(16).padStart(2,'0');
+        } else {
+          ctx.fillStyle = currentTheme.alive;
+        }
+        const gap = showGrid && cs > 3 ? 1 : 0;
+        ctx.fillRect(px + gap, py + gap, cs - gap, cs - gap);
+      }
+    }
+  }
+
+  if (showGrid && cs > 3) {
+    ctx.strokeStyle = currentTheme.grid;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let x = offX; x <= w; x += cs) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+    }
+    for (let y = offY; y <= h; y += cs) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+    }
+    ctx.stroke();
+  }
+
+  if (pendingPattern) {
+    drawPatternPreview();
+  }
+}
+
+function drawPatternPreview() {
+  if (!pendingPattern || !pendingPattern.mouseX) return;
+  const cs = CELL_SIZE * zoom;
+  const mx = pendingPattern.mouseX;
+  const my = pendingPattern.mouseY;
+  const pat = pendingPattern.data;
+  const ph = pat.length, pw = pat[0].length;
+  const startPx = mx - Math.floor(pw / 2) * cs;
+  const startPy = my - Math.floor(ph / 2) * cs;
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = currentTheme.alive || '#ff8844';
+  for (let r = 0; r < ph; r++) {
+    for (let c = 0; c < pw; c++) {
+      if (pat[r][c]) {
+        ctx.fillRect(startPx + c * cs, startPy + r * cs, cs - 1, cs - 1);
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function screenToGrid(sx, sy) {
+  const cs = CELL_SIZE * zoom;
+  const x = Math.floor((sx - panX) / cs);
+  const y = Math.floor((sy - panY) / cs);
+  return [x, y];
+}
+
+function setCell(gx, gy, val) {
+  if (wrapEdges) {
+    gx = ((gx % cols) + cols) % cols;
+    gy = ((gy % rows) + rows) % rows;
+  } else if (gx < 0 || gx >= cols || gy < 0 || gy >= rows) return;
+  const idx = gy * cols + gx;
+  grid[idx] = val;
+  ageGrid[idx] = val ? 1 : 0;
+}
+
+function paintBrush(sx, sy, val) {
+  const [cx, cy] = screenToGrid(sx, sy);
+  const half = Math.floor(brushSize / 2);
+  for (let dy = -half; dy <= half; dy++) {
+    for (let dx = -half; dx <= half; dx++) {
+      setCell(cx + dx, cy + dy, val);
+    }
+  }
+}
+
+function placePattern(sx, sy, pat) {
+  const [cx, cy] = screenToGrid(sx, sy);
+  const ph = pat.length, pw = pat[0].length;
+  const ox = Math.floor(pw / 2), oy = Math.floor(ph / 2);
+  for (let r = 0; r < ph; r++) {
+    for (let c = 0; c < pw; c++) {
+      if (pat[r][c]) setCell(cx + c - ox, cy + r - oy, 1);
+    }
+  }
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button === 1) {
+    isPanning = true;
+    panStartX = e.clientX - panX;
+    panStartY = e.clientY - panY;
+    canvas.style.cursor = 'grabbing';
+    e.preventDefault();
+    return;
+  }
+  if (pendingPattern) {
+    const rect = canvas.getBoundingClientRect();
+    placePattern(e.clientX - rect.left, e.clientY - rect.top, pendingPattern.data);
+    pendingPattern = null;
+    canvas.style.cursor = 'crosshair';
+    return;
+  }
+  isDrawing = true;
+  drawMode = e.button === 2 ? 0 : 1;
+  const rect = canvas.getBoundingClientRect();
+  paintBrush(e.clientX - rect.left, e.clientY - rect.top, drawMode);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (isPanning) {
+    panX = e.clientX - panStartX;
+    panY = e.clientY - panStartY;
+    return;
+  }
+  if (pendingPattern) {
+    const rect = canvas.getBoundingClientRect();
+    pendingPattern.mouseX = e.clientX - rect.left;
+    pendingPattern.mouseY = e.clientY - rect.top;
+    return;
+  }
+  if (isDrawing) {
+    const rect = canvas.getBoundingClientRect();
+    paintBrush(e.clientX - rect.left, e.clientY - rect.top, drawMode);
+  }
+});
+
+canvas.addEventListener('mouseup', () => { isDrawing = false; });
+canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+window.addEventListener('mouseup', () => {
+  isDrawing = false;
+  if (isPanning) { isPanning = false; canvas.style.cursor = 'crosshair'; }
+});
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const oldZoom = zoom;
+  if (e.deltaY < 0) zoom = Math.min(zoom * 1.15, 8);
+  else zoom = Math.max(zoom / 1.15, 0.2);
+  panX = mx - (mx - panX) * (zoom / oldZoom);
+  panY = my - (my - panY) * (zoom / oldZoom);
+}, { passive: false });
+
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    e.preventDefault();
+    isDrawing = true;
+    drawMode = 1;
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    if (pendingPattern) {
+      placePattern(t.clientX - rect.left, t.clientY - rect.top, pendingPattern.data);
+      pendingPattern = null;
+    } else {
+      paintBrush(t.clientX - rect.left, t.clientY - rect.top, 1);
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 1 && isDrawing) {
+    e.preventDefault();
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    paintBrush(t.clientX - rect.left, t.clientY - rect.top, 1);
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+// Toolbar
+const playBtn = document.getElementById('playBtn');
+const stepBtn = document.getElementById('stepBtn');
+const clearBtn = document.getElementById('clearBtn');
+const randomBtn = document.getElementById('randomBtn');
+const speedSlider = document.getElementById('speedSlider');
+const ruleSelect = document.getElementById('ruleSelect');
+const patternBtn = document.getElementById('patternBtn');
+const patternMenu = document.getElementById('patternMenu');
+const brushSelect = document.getElementById('brushSize');
+const colorBtn = document.getElementById('colorBtn');
+const colorMenu = document.getElementById('colorMenu');
+const gridToggle = document.getElementById('gridToggle');
+const wrapToggle = document.getElementById('wrapToggle');
+const trailToggle = document.getElementById('trailToggle');
+
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+  playBtn.classList.toggle('active', playing);
+});
+
+stepBtn.addEventListener('click', () => { if (!playing) step(); });
+clearBtn.addEventListener('click', clearGrid);
+randomBtn.addEventListener('click', () => randomize(0.25));
+
+speedSlider.addEventListener('input', () => { targetFPS = parseInt(speedSlider.value); });
+
+ruleSelect.addEventListener('change', () => {
+  currentRule = RULES[ruleSelect.value];
+});
+
+patternBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  patternMenu.classList.toggle('open');
+  colorMenu.classList.remove('open');
+});
+
+patternMenu.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pattern]');
+  if (!btn) return;
+  pendingPattern = { data: PATTERNS[btn.dataset.pattern], mouseX: null, mouseY: null };
+  canvas.style.cursor = 'copy';
+  patternMenu.classList.remove('open');
+});
+
+colorBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  colorMenu.classList.toggle('open');
+  patternMenu.classList.remove('open');
+});
+
+colorMenu.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-theme]');
+  if (!btn) return;
+  currentThemeName = btn.dataset.theme;
+  currentTheme = THEMES[currentThemeName];
+  colorMenu.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  colorMenu.classList.remove('open');
+});
+
+document.addEventListener('click', () => {
+  patternMenu.classList.remove('open');
+  colorMenu.classList.remove('open');
+});
+
+brushSelect.addEventListener('change', () => { brushSize = parseInt(brushSelect.value); });
+gridToggle.addEventListener('change', () => { showGrid = gridToggle.checked; });
+wrapToggle.addEventListener('change', () => { wrapEdges = wrapToggle.checked; });
+trailToggle.addEventListener('change', () => { showTrails = trailToggle.checked; });
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  switch(e.key.toLowerCase()) {
+    case ' ': e.preventDefault(); playBtn.click(); break;
+    case 's': if (!playing) step(); break;
+    case 'c': clearGrid(); break;
+    case 'r': randomize(); break;
+    case 'escape': pendingPattern = null; canvas.style.cursor = 'crosshair'; break;
+  }
+});
+
+const genEl = document.getElementById('genCount');
+const popEl = document.getElementById('popCount');
+const fpsEl = document.getElementById('fpsCount');
+
+function updateStats() {
+  genEl.textContent = generation.toLocaleString();
+  popEl.textContent = population.toLocaleString();
+  fpsEl.textContent = currentFPS;
+}
+
+const hint = document.getElementById('hint');
+setTimeout(() => { hint.style.opacity = '0'; }, 5000);
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  frameCount++;
+  if (now - lastFPSUpdate >= 1000) {
+    currentFPS = frameCount;
+    frameCount = 0;
+    lastFPSUpdate = now;
+  }
+  if (playing && now - lastFrame >= 1000 / targetFPS) {
+    step();
+    lastFrame = now;
+  }
+  draw();
+  updateStats();
+}
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  canvas.width = w;
+  canvas.height = h;
+  const oldCols = cols, oldRows = rows;
+  cols = Math.ceil(w / CELL_SIZE) + 20;
+  rows = Math.ceil(h / CELL_SIZE) + 20;
+  if (oldCols !== cols || oldRows !== rows) {
+    const newGrid = new Uint8Array(cols * rows);
+    const newAge = new Uint16Array(cols * rows);
+    if (grid) {
+      for (let y = 0; y < Math.min(rows, oldRows); y++)
+        for (let x = 0; x < Math.min(cols, oldCols); x++) {
+          newGrid[y * cols + x] = grid[y * oldCols + x];
+          newAge[y * cols + x] = ageGrid[y * oldCols + x];
+        }
+    }
+    grid = newGrid;
+    nextGrid = new Uint8Array(cols * rows);
+    ageGrid = newAge;
+  }
+}
+
+window.addEventListener('resize', resize);
+cols = 0; rows = 0;
+resize();
+randomize(0.2);
+playing = true;
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
