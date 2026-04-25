@@ -36,6 +36,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "falling-sand", "-l", "3461"],
       "port": 3461
+    },
+    {
+      "name": "solar-system-orrery",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "solar-system-orrery", "-l", "3462"],
+      "port": 3462
     }
   ]
 }

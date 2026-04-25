@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maze Generator & Pathfinder</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a12;
+  color: #e0e0f0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+header {
+  padding: 18px 24px;
+  background: rgba(10, 10, 18, 0.95);
+  border-bottom: 1px solid #1e1e2e;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  font-size: 1.6rem;
+  filter: drop-shadow(0 0 8px rgba(120, 100, 255, 0.5));
+}
+
+h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, #a78bfa, #60d4f0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 0.72rem;
+  color: #6a6a8a;
+  margin-top: 1px;
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: #0e0e18;
+  border-right: 1px solid #1e1e2e;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.panel {
+  background: #13131f;
+  border: 1px solid #1e1e2e;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.panel-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #6a6a8a;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.control-row:last-child { margin-bottom: 0; }
+
+.control-label {
+  font-size: 0.78rem;
+  color: #aaa;
+}
+
+.control-value {
+  font-size: 0.72rem;
+  color: #7c6ff7;
+  font-weight: 600;
+  min-width: 30px;
+  text-align: right;
+}
+
+select, input[type="range"] {
+  appearance: none;
+  background: #1a1a28;
+  border: 1px solid #2a2a3e;
+  border-radius: 6px;
+  color: #e0e0f0;
+  font-size: 0.78rem;
+  padding: 6px 10px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+select:hover, input[type="range"]:hover {
+  border-color: #7c6ff7;
+}
+
+select {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  padding: 0;
+  border: none;
+  background: #1a1a28;
+  border-radius: 2px;
+  margin: 6px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7c6ff7;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(124, 111, 247, 0.5);
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #2a2a3e;
+  border-radius: 8px;
+  background: #1a1a28;
+  color: #e0e0f0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  border-color: #7c6ff7;
+  background: #1e1e30;
+  box-shadow: 0 0 12px rgba(124, 111, 247, 0.15);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #7c6ff7, #5a4fd4);
+  border-color: #7c6ff7;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #8a7ff9, #6a5fe6);
+  box-shadow: 0 0 20px rgba(124, 111, 247, 0.3);
+}
+
+.btn-solve {
+  background: linear-gradient(135deg, #5ee7b7, #40c090);
+  border-color: #5ee7b7;
+  color: #0a0a12;
+}
+
+.btn-solve:hover {
+  background: linear-gradient(135deg, #6af0c4, #50d0a0);
+  box-shadow: 0 0 20px rgba(94, 231, 183, 0.3);
+}
+
+.btn-race {
+  background: linear-gradient(135deg, #f7a06f, #e07840);
+  border-color: #f7a06f;
+  color: #0a0a12;
+}
+
+.btn-race:hover {
+  background: linear-gradient(135deg, #f8b080, #e88850);
+  box-shadow: 0 0 20px rgba(247, 160, 111, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.canvas-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+}
+
+canvas {
+  border-radius: 12px;
+  box-shadow: 0 0 40px rgba(124, 111, 247, 0.08);
+}
+
+.stats-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  background: rgba(14, 14, 24, 0.92);
+  border: 1px solid #1e1e2e;
+  border-radius: 20px;
+  padding: 8px 20px;
+  backdrop-filter: blur(10px);
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+}
+
+.stat-label { color: #6a6a8a; }
+.stat-value { color: #a78bfa; font-weight: 700; }
+.stat-value.green { color: #5ee7b7; }
+.stat-value.orange { color: #f7a06f; }
+.stat-value.red { color: #f76f6f; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: #888;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.speed-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.speed-btn {
+  padding: 3px 8px;
+  border: 1px solid #2a2a3e;
+  border-radius: 4px;
+  background: #1a1a28;
+  color: #aaa;
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.speed-btn:hover, .speed-btn.active {
+  border-color: #7c6ff7;
+  color: #7c6ff7;
+  background: #1e1e30;
+}
+
+.race-results {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(14, 14, 24, 0.96);
+  border: 1px solid #2a2a3e;
+  border-radius: 16px;
+  padding: 24px 32px;
+  backdrop-filter: blur(12px);
+  z-index: 50;
+  min-width: 320px;
+}
+
+.race-results h3 {
+  text-align: center;
+  margin-bottom: 16px;
+  font-size: 1rem;
+  color: #f7a06f;
+}
+
+.race-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #1a1a28;
+  font-size: 0.82rem;
+}
+
+.race-result-row:last-child { border-bottom: none; }
+
+.race-rank { font-weight: 700; width: 24px; }
+.race-name { flex: 1; margin-left: 8px; }
+.race-steps { color: #7c6ff7; font-weight: 600; }
+.race-path { color: #5ee7b7; font-weight: 600; margin-left: 12px; }
+
+.race-close {
+  margin-top: 14px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .main-layout { flex-direction: column; }
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid #1e1e2e;
+    padding: 10px;
+    gap: 8px;
+  }
+  .panel { flex: 1; min-width: 200px; }
+  .canvas-area { padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🧩</div>
+  <div>
+    <h1>Maze Generator & Pathfinder</h1>
+    <div class="subtitle">Generate mazes and watch algorithms find their way</div>
+  </div>
+</header>
+
+<div class="main-layout">
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-title">Maze Generation</div>
+      <select id="gen-algo">
+        <option value="dfs">Recursive Backtracker (DFS)</option>
+        <option value="kruskal">Kruskal's Algorithm</option>
+        <option value="prim">Prim's Algorithm</option>
+        <option value="division">Recursive Division</option>
+        <option value="aldous-broder">Aldous-Broder</option>
+        <option value="binary-tree">Binary Tree</option>
+      </select>
+      <div class="control-row">
+        <span class="control-label">Grid Size</span>
+        <span class="control-value" id="size-val">25</span>
+      </div>
+      <input type="range" id="maze-size" min="10" max="60" value="25">
+      <button class="btn btn-primary" id="btn-generate">Generate Maze</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Pathfinding</div>
+      <select id="solve-algo">
+        <option value="astar">A* Search</option>
+        <option value="bfs">Breadth-First Search</option>
+        <option value="dfs-solve">Depth-First Search</option>
+        <option value="dijkstra">Dijkstra's Algorithm</option>
+        <option value="greedy">Greedy Best-First</option>
+        <option value="wall-follower">Wall Follower (Right)</option>
+      </select>
+      <div class="control-row">
+        <span class="control-label">Speed</span>
+        <div class="speed-controls">
+          <button class="speed-btn" data-speed="1">1x</button>
+          <button class="speed-btn active" data-speed="5">5x</button>
+          <button class="speed-btn" data-speed="20">20x</button>
+          <button class="speed-btn" data-speed="100">Max</button>
+        </div>
+      </div>
+      <button class="btn btn-solve" id="btn-solve">Solve Maze</button>
+      <div style="height:6px"></div>
+      <button class="btn btn-race" id="btn-race">Race All Algorithms</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Display</div>
+      <select id="color-theme">
+        <option value="neon">Neon</option>
+        <option value="ocean">Ocean</option>
+        <option value="fire">Fire</option>
+        <option value="forest">Forest</option>
+        <option value="synthwave">Synthwave</option>
+        <option value="monochrome">Monochrome</option>
+      </select>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Presets</div>
+      <button class="btn preset-btn" data-preset="tiny">Tiny (10x10)</button>
+      <div style="height:4px"></div>
+      <button class="btn preset-btn" data-preset="medium">Medium (30x30)</button>
+      <div style="height:4px"></div>
+      <button class="btn preset-btn" data-preset="large">Large (50x50)</button>
+      <div style="height:4px"></div>
+      <button class="btn preset-btn" data-preset="giant">Giant (60x60)</button>
+    </div>
+  </div>
+
+  <div class="canvas-area">
+    <canvas id="maze-canvas"></canvas>
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-label">Cells Explored:</span>
+        <span class="stat-value" id="stat-explored">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Path Length:</span>
+        <span class="stat-value green" id="stat-path">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Time:</span>
+        <span class="stat-value orange" id="stat-time">—</span>
+      </div>
+    </div>
+    <div class="race-results" id="race-results">
+      <h3>Race Results</h3>
+      <div id="race-rows"></div>
+      <div class="race-close">
+        <button class="btn" id="race-close-btn" style="width:auto;padding:6px 20px;">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('maze-canvas');
+const ctx = canvas.getContext('2d');
+
+const WALL = 1;
+const PATH = 0;
+const VISITED = 2;
+const SOLUTION = 3;
+const START = 4;
+const END = 5;
+const CURRENT = 6;
+
+const themes = {
+  neon: {
+    bg: '#0a0a12', wall: '#1a1a2e', path: '#16162a',
+    visited: '#2a1a50', solution: '#7c6ff7', start: '#5ee7b7',
+    end: '#f76f6f', current: '#f7d76f', frontier: '#3a2a6a',
+    visitedGrad: ['#1a1040', '#3a2070']
+  },
+  ocean: {
+    bg: '#0a1020', wall: '#0e2040', path: '#0c1830',
+    visited: '#1a3060', solution: '#60d4f0', start: '#40f080',
+    end: '#f06060', current: '#f0e040', frontier: '#1a4070',
+    visitedGrad: ['#102040', '#1a4070']
+  },
+  fire: {
+    bg: '#120a08', wall: '#2e1a0e', path: '#1a1008',
+    visited: '#3e2010', solution: '#f7a06f', start: '#5ee7b7',
+    end: '#f76f6f', current: '#f7f06f', frontier: '#4e3020',
+    visitedGrad: ['#2e1808', '#4e3020']
+  },
+  forest: {
+    bg: '#0a120a', wall: '#1a2e1a', path: '#0e1a0e',
+    visited: '#1a3a20', solution: '#80e080', start: '#60d0f0',
+    end: '#f06060', current: '#f0f060', frontier: '#2a4a28',
+    visitedGrad: ['#1a3018', '#2a4a28']
+  },
+  synthwave: {
+    bg: '#0e0618', wall: '#2a1040', path: '#140a24',
+    visited: '#30184a', solution: '#ff6ec7', start: '#00ffff',
+    end: '#ff4444', current: '#ffff00', frontier: '#40206a',
+    visitedGrad: ['#20103a', '#40206a']
+  },
+  monochrome: {
+    bg: '#0a0a0a', wall: '#2a2a2a', path: '#151515',
+    visited: '#2a2a2a', solution: '#ffffff', start: '#aaffaa',
+    end: '#ffaaaa', current: '#ffffaa', frontier: '#333',
+    visitedGrad: ['#1a1a1a', '#333']
+  }
+};
+
+let gridSize = 25;
+let grid = [];
+let cellSize = 0;
+let animating = false;
+let animSpeed = 5;
+let currentTheme = 'neon';
+let startPos, endPos;
+
+function getTheme() { return themes[currentTheme]; }
+
+function initGrid(size) {
+  const rows = size * 2 + 1;
+  const cols = size * 2 + 1;
+  grid = [];
+  for (let r = 0; r < rows; r++) {
+    grid[r] = [];
+    for (let c = 0; c < cols; c++) {
+      grid[r][c] = WALL;
+    }
+  }
+  return { rows, cols };
+}
+
+function generateMaze_DFS(size) {
+  const { rows, cols } = initGrid(size);
+  const visited = new Set();
+  const stack = [];
+  const sr = 1, sc = 1;
+  grid[sr][sc] = PATH;
+  visited.add(`${sr},${sc}`);
+  stack.push([sr, sc]);
+  const dirs = [[0,2],[0,-2],[2,0],[-2,0]];
+  const steps = [];
+
+  while (stack.length > 0) {
+    const [cr, cc] = stack[stack.length - 1];
+    const shuffled = dirs.slice().sort(() => Math.random() - 0.5);
+    let found = false;
+    for (const [dr, dc] of shuffled) {
+      const nr = cr + dr, nc = cc + dc;
+      if (nr > 0 && nr < rows - 1 && nc > 0 && nc < cols - 1 && !visited.has(`${nr},${nc}`)) {
+        grid[cr + dr/2][cc + dc/2] = PATH;
+        grid[nr][nc] = PATH;
+        visited.add(`${nr},${nc}`);
+        stack.push([nr, nc]);
+        steps.push([cr + dr/2, cc + dc/2], [nr, nc]);
+        found = true;
+        break;
+      }
+    }
+    if (!found) stack.pop();
+  }
+  return steps;
+}
+
+function generateMaze_Kruskal(size) {
+  const { rows, cols } = initGrid(size);
+  const parent = {};
+  const cells = [];
+  const edges = [];
+  const steps = [];
+
+  for (let r = 1; r < rows; r += 2) {
+    for (let c = 1; c < cols; c += 2) {
+      grid[r][c] = PATH;
+      const key = `${r},${c}`;
+      parent[key] = key;
+      cells.push([r, c]);
+      if (c + 2 < cols) edges.push([[r,c],[r,c+2],[r,c+1]]);
+      if (r + 2 < rows) edges.push([[r,c],[r+2,c],[r+1,c]]);
+    }
+  }
+
+  function find(k) {
+    if (parent[k] !== k) parent[k] = find(parent[k]);
+    return parent[k];
+  }
+  function union(a, b) { parent[find(a)] = find(b); }
+
+  edges.sort(() => Math.random() - 0.5);
+  for (const [a, b, wall] of edges) {
+    const ka = `${a[0]},${a[1]}`, kb = `${b[0]},${b[1]}`;
+    if (find(ka) !== find(kb)) {
+      union(ka, kb);
+      grid[wall[0]][wall[1]] = PATH;
+      steps.push(wall);
+    }
+  }
+  return steps;
+}
+
+function generateMaze_Prim(size) {
+  const { rows, cols } = initGrid(size);
+  const inMaze = new Set();
+  const frontier = [];
+  const steps = [];
+  const dirs = [[0,2],[0,-2],[2,0],[-2,0]];
+
+  function addFrontier(r, c) {
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc;
+      if (nr > 0 && nr < rows - 1 && nc > 0 && nc < cols - 1 && !inMaze.has(`${nr},${nc}`)) {
+        frontier.push([nr, nc, r + dr/2, c + dc/2]);
+      }
+    }
+  }
+
+  const sr = 1, sc = 1;
+  grid[sr][sc] = PATH;
+  inMaze.add(`${sr},${sc}`);
+  addFrontier(sr, sc);
+
+  while (frontier.length > 0) {
+    const idx = Math.floor(Math.random() * frontier.length);
+    const [nr, nc, wr, wc] = frontier.splice(idx, 1)[0];
+    if (!inMaze.has(`${nr},${nc}`)) {
+      grid[wr][wc] = PATH;
+      grid[nr][nc] = PATH;
+      inMaze.add(`${nr},${nc}`);
+      steps.push([wr, wc], [nr, nc]);
+      addFrontier(nr, nc);
+    }
+  }
+  return steps;
+}
+
+function generateMaze_Division(size) {
+  const { rows, cols } = initGrid(size);
+  const steps = [];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) grid[r][c] = WALL;
+      else grid[r][c] = PATH;
+    }
+  }
+
+  function divide(minR, maxR, minC, maxC) {
+    const h = maxR - minR + 1;
+    const w = maxC - minC + 1;
+    if (h < 3 || w < 3) return;
+
+    if (h > w) {
+      const candidates = [];
+      for (let r = minR + 1; r < maxR; r += 1) {
+        if (r % 2 === 0) candidates.push(r);
+      }
+      if (candidates.length === 0) return;
+      const wallRow = candidates[Math.floor(Math.random() * candidates.length)];
+      const holeCandidates = [];
+      for (let c = minC; c <= maxC; c++) {
+        if (c % 2 === 1) holeCandidates.push(c);
+      }
+      const hole = holeCandidates[Math.floor(Math.random() * holeCandidates.length)];
+      for (let c = minC; c <= maxC; c++) {
+        if (c !== hole) {
+          grid[wallRow][c] = WALL;
+          steps.push([wallRow, c]);
+        }
+      }
+      divide(minR, wallRow - 1, minC, maxC);
+      divide(wallRow + 1, maxR, minC, maxC);
+    } else {
+      const candidates = [];
+      for (let c = minC + 1; c < maxC; c += 1) {
+        if (c % 2 === 0) candidates.push(c);
+      }
+      if (candidates.length === 0) return;
+      const wallCol = candidates[Math.floor(Math.random() * candidates.length)];
+      const holeCandidates = [];
+      for (let r = minR; r <= maxR; r++) {
+        if (r % 2 === 1) holeCandidates.push(r);
+      }
+      const hole = holeCandidates[Math.floor(Math.random() * holeCandidates.length)];
+      for (let r = minR; r <= maxR; r++) {
+        if (r !== hole) {
+          grid[r][wallCol] = WALL;
+          steps.push([r, wallCol]);
+        }
+      }
+      divide(minR, maxR, minC, wallCol - 1);
+      divide(minR, maxR, wallCol + 1, maxC);
+    }
+  }
+
+  divide(1, rows - 2, 1, cols - 2);
+  return steps;
+}
+
+function generateMaze_AldousBroder(size) {
+  const { rows, cols } = initGrid(size);
+  const totalCells = size * size;
+  let visitedCount = 1;
+  const visited = new Set();
+  const steps = [];
+  const dirs = [[0,2],[0,-2],[2,0],[-2,0]];
+
+  let cr = 1, cc = 1;
+  grid[cr][cc] = PATH;
+  visited.add(`${cr},${cc}`);
+
+  while (visitedCount < totalCells) {
+    const shuffled = dirs.slice().sort(() => Math.random() - 0.5);
+    for (const [dr, dc] of shuffled) {
+      const nr = cr + dr, nc = cc + dc;
+      if (nr > 0 && nr < rows - 1 && nc > 0 && nc < cols - 1) {
+        if (!visited.has(`${nr},${nc}`)) {
+          grid[cr + dr/2][cc + dc/2] = PATH;
+          grid[nr][nc] = PATH;
+          visited.add(`${nr},${nc}`);
+          visitedCount++;
+          steps.push([cr + dr/2, cc + dc/2], [nr, nc]);
+        }
+        cr = nr;
+        cc = nc;
+        break;
+      }
+    }
+  }
+  return steps;
+}
+
+function generateMaze_BinaryTree(size) {
+  const { rows, cols } = initGrid(size);
+  const steps = [];
+
+  for (let r = 1; r < rows; r += 2) {
+    for (let c = 1; c < cols; c += 2) {
+      grid[r][c] = PATH;
+      const canN = r - 2 > 0;
+      const canW = c - 2 > 0;
+      if (canN && canW) {
+        if (Math.random() < 0.5) {
+          grid[r-1][c] = PATH;
+          steps.push([r-1, c]);
+        } else {
+          grid[r][c-1] = PATH;
+          steps.push([r, c-1]);
+        }
+      } else if (canN) {
+        grid[r-1][c] = PATH;
+        steps.push([r-1, c]);
+      } else if (canW) {
+        grid[r][c-1] = PATH;
+        steps.push([r, c-1]);
+      }
+    }
+  }
+  return steps;
+}
+
+function generateMaze(algo) {
+  switch (algo) {
+    case 'dfs': return generateMaze_DFS(gridSize);
+    case 'kruskal': return generateMaze_Kruskal(gridSize);
+    case 'prim': return generateMaze_Prim(gridSize);
+    case 'division': return generateMaze_Division(gridSize);
+    case 'aldous-broder': return generateMaze_AldousBroder(gridSize);
+    case 'binary-tree': return generateMaze_BinaryTree(gridSize);
+  }
+}
+
+function resizeCanvas() {
+  const area = document.querySelector('.canvas-area');
+  const maxW = area.clientWidth - 48;
+  const maxH = area.clientHeight - 80;
+  const rows = gridSize * 2 + 1;
+  cellSize = Math.floor(Math.min(maxW / rows, maxH / rows));
+  cellSize = Math.max(cellSize, 3);
+  canvas.width = rows * cellSize;
+  canvas.height = rows * cellSize;
+}
+
+function drawCell(r, c, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+}
+
+function renderMaze() {
+  const theme = getTheme();
+  const rows = grid.length;
+  const cols = grid[0].length;
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const val = grid[r][c];
+      let color;
+      if (val === WALL) color = theme.wall;
+      else if (val === VISITED) color = theme.visited;
+      else if (val === SOLUTION) color = theme.solution;
+      else if (val === START) color = theme.start;
+      else if (val === END) color = theme.end;
+      else if (val === CURRENT) color = theme.current;
+      else color = theme.path;
+      drawCell(r, c, color);
+    }
+  }
+}
+
+function setStartEnd() {
+  startPos = [1, 1];
+  const rows = grid.length;
+  const cols = grid[0].length;
+  endPos = [rows - 2, cols - 2];
+  grid[startPos[0]][startPos[1]] = START;
+  grid[endPos[0]][endPos[1]] = END;
+}
+
+function heuristic(a, b) {
+  return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+}
+
+function getNeighbors(r, c) {
+  const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+  const result = [];
+  for (const [dr, dc] of dirs) {
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < grid.length && nc >= 0 && nc < grid[0].length && grid[nr][nc] !== WALL) {
+      result.push([nr, nc]);
+    }
+  }
+  return result;
+}
+
+function solve_AStar() {
+  const open = [];
+  const gScore = {};
+  const fScore = {};
+  const cameFrom = {};
+  const visited = [];
+  const key = (r,c) => `${r},${c}`;
+
+  const sk = key(...startPos);
+  gScore[sk] = 0;
+  fScore[sk] = heuristic(startPos, endPos);
+  open.push({ pos: startPos, f: fScore[sk] });
+
+  while (open.length > 0) {
+    open.sort((a, b) => a.f - b.f);
+    const { pos: [cr, cc] } = open.shift();
+    const ck = key(cr, cc);
+
+    if (cr === endPos[0] && cc === endPos[1]) {
+      const path = [];
+      let k = ck;
+      while (k) { const [r,c] = k.split(',').map(Number); path.unshift([r,c]); k = cameFrom[k]; }
+      return { visited, path };
+    }
+
+    for (const [nr, nc] of getNeighbors(cr, cc)) {
+      const nk = key(nr, nc);
+      const tent = (gScore[ck] || 0) + 1;
+      if (tent < (gScore[nk] ?? Infinity)) {
+        cameFrom[nk] = ck;
+        gScore[nk] = tent;
+        fScore[nk] = tent + heuristic([nr,nc], endPos);
+        if (!open.find(o => key(...o.pos) === nk)) {
+          open.push({ pos: [nr,nc], f: fScore[nk] });
+          visited.push([nr, nc]);
+        }
+      }
+    }
+  }
+  return { visited, path: [] };
+}
+
+function solve_BFS() {
+  const queue = [startPos];
+  const cameFrom = {};
+  const seen = new Set();
+  const visited = [];
+  const key = (r,c) => `${r},${c}`;
+
+  seen.add(key(...startPos));
+
+  while (queue.length > 0) {
+    const [cr, cc] = queue.shift();
+    if (cr === endPos[0] && cc === endPos[1]) {
+      const path = [];
+      let k = key(cr, cc);
+      while (k) { const [r,c] = k.split(',').map(Number); path.unshift([r,c]); k = cameFrom[k]; }
+      return { visited, path };
+    }
+    for (const [nr, nc] of getNeighbors(cr, cc)) {
+      const nk = key(nr, nc);
+      if (!seen.has(nk)) {
+        seen.add(nk);
+        cameFrom[nk] = key(cr, cc);
+        queue.push([nr, nc]);
+        visited.push([nr, nc]);
+      }
+    }
+  }
+  return { visited, path: [] };
+}
+
+function solve_DFS() {
+  const stack = [startPos];
+  const cameFrom = {};
+  const seen = new Set();
+  const visited = [];
+  const key = (r,c) => `${r},${c}`;
+
+  seen.add(key(...startPos));
+
+  while (stack.length > 0) {
+    const [cr, cc] = stack.pop();
+    visited.push([cr, cc]);
+    if (cr === endPos[0] && cc === endPos[1]) {
+      const path = [];
+      let k = key(cr, cc);
+      while (k) { const [r,c] = k.split(',').map(Number); path.unshift([r,c]); k = cameFrom[k]; }
+      return { visited, path };
+    }
+    for (const [nr, nc] of getNeighbors(cr, cc)) {
+      const nk = key(nr, nc);
+      if (!seen.has(nk)) {
+        seen.add(nk);
+        cameFrom[nk] = key(cr, cc);
+        stack.push([nr, nc]);
+      }
+    }
+  }
+  return { visited, path: [] };
+}
+
+function solve_Dijkstra() {
+  return solve_AStar();
+}
+
+function solve_Greedy() {
+  const open = [{ pos: startPos, h: heuristic(startPos, endPos) }];
+  const cameFrom = {};
+  const seen = new Set();
+  const visited = [];
+  const key = (r,c) => `${r},${c}`;
+
+  seen.add(key(...startPos));
+
+  while (open.length > 0) {
+    open.sort((a, b) => a.h - b.h);
+    const { pos: [cr, cc] } = open.shift();
+
+    if (cr === endPos[0] && cc === endPos[1]) {
+      const path = [];
+      let k = key(cr, cc);
+      while (k) { const [r,c] = k.split(',').map(Number); path.unshift([r,c]); k = cameFrom[k]; }
+      return { visited, path };
+    }
+
+    for (const [nr, nc] of getNeighbors(cr, cc)) {
+      const nk = key(nr, nc);
+      if (!seen.has(nk)) {
+        seen.add(nk);
+        cameFrom[nk] = key(cr, cc);
+        open.push({ pos: [nr,nc], h: heuristic([nr,nc], endPos) });
+        visited.push([nr, nc]);
+      }
+    }
+  }
+  return { visited, path: [] };
+}
+
+function solve_WallFollower() {
+  const visited = [];
+  const path = [];
+  const key = (r,c) => `${r},${c}`;
+  const dirs = [[-1,0],[0,1],[1,0],[0,-1]];
+  let dir = 1;
+  let [cr, cc] = startPos;
+  const seen = new Set();
+  let steps = 0;
+  const maxSteps = grid.length * grid[0].length * 4;
+
+  while (steps < maxSteps) {
+    path.push([cr, cc]);
+    visited.push([cr, cc]);
+    if (cr === endPos[0] && cc === endPos[1]) break;
+
+    const rightDir = (dir + 1) % 4;
+    const rr = cr + dirs[rightDir][0], rc = cc + dirs[rightDir][1];
+    if (rr >= 0 && rr < grid.length && rc >= 0 && rc < grid[0].length && grid[rr][rc] !== WALL) {
+      dir = rightDir;
+      cr = rr;
+      cc = rc;
+    } else {
+      const fr = cr + dirs[dir][0], fc = cc + dirs[dir][1];
+      if (fr >= 0 && fr < grid.length && fc >= 0 && fc < grid[0].length && grid[fr][fc] !== WALL) {
+        cr = fr;
+        cc = fc;
+      } else {
+        dir = (dir + 3) % 4;
+      }
+    }
+    steps++;
+  }
+  return { visited, path };
+}
+
+function solve(algo) {
+  switch(algo) {
+    case 'astar': return solve_AStar();
+    case 'bfs': return solve_BFS();
+    case 'dfs-solve': return solve_DFS();
+    case 'dijkstra': return solve_Dijkstra();
+    case 'greedy': return solve_Greedy();
+    case 'wall-follower': return solve_WallFollower();
+  }
+}
+
+async function animateSolve(result, onProgress) {
+  const { visited, path } = result;
+  const theme = getTheme();
+  let exploredCount = 0;
+
+  for (let i = 0; i < visited.length; i++) {
+    if (!animating) return false;
+    const [r, c] = visited[i];
+    if (grid[r][c] !== START && grid[r][c] !== END) {
+      grid[r][c] = VISITED;
+      drawCell(r, c, theme.visited);
+    }
+    exploredCount++;
+    if (onProgress) onProgress(exploredCount, 0);
+    if (i % animSpeed === 0) {
+      await new Promise(r => requestAnimationFrame(r));
+    }
+  }
+
+  for (let i = 0; i < path.length; i++) {
+    if (!animating) return false;
+    const [r, c] = path[i];
+    if (grid[r][c] !== START && grid[r][c] !== END) {
+      grid[r][c] = SOLUTION;
+      drawCell(r, c, theme.solution);
+    }
+    if (onProgress) onProgress(exploredCount, i + 1);
+    if (animSpeed < 50 && i % Math.max(1, Math.floor(animSpeed / 2)) === 0) {
+      await new Promise(r => requestAnimationFrame(r));
+    }
+  }
+
+  return true;
+}
+
+function clearSolution() {
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[0].length; c++) {
+      if (grid[r][c] === VISITED || grid[r][c] === SOLUTION || grid[r][c] === CURRENT) {
+        grid[r][c] = PATH;
+      }
+    }
+  }
+  setStartEnd();
+}
+
+function updateStats(explored, pathLen, time) {
+  document.getElementById('stat-explored').textContent = explored;
+  document.getElementById('stat-path').textContent = pathLen || '—';
+  document.getElementById('stat-time').textContent = time ? `${time}ms` : '—';
+}
+
+function updateLegend() {
+  const theme = getTheme();
+  const items = [
+    { color: theme.wall, label: 'Wall' },
+    { color: theme.path, label: 'Path' },
+    { color: theme.start, label: 'Start' },
+    { color: theme.end, label: 'End' },
+    { color: theme.visited, label: 'Explored' },
+    { color: theme.solution, label: 'Solution' }
+  ];
+  document.getElementById('legend').innerHTML = items.map(i =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${i.color}"></div>${i.label}</div>`
+  ).join('');
+}
+
+document.getElementById('maze-size').addEventListener('input', e => {
+  gridSize = parseInt(e.target.value);
+  document.getElementById('size-val').textContent = gridSize;
+});
+
+document.getElementById('color-theme').addEventListener('change', e => {
+  currentTheme = e.target.value;
+  updateLegend();
+  renderMaze();
+});
+
+document.querySelectorAll('.speed-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    animSpeed = parseInt(btn.dataset.speed);
+  });
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const presets = { tiny: 10, medium: 30, large: 50, giant: 60 };
+    gridSize = presets[btn.dataset.preset];
+    document.getElementById('maze-size').value = gridSize;
+    document.getElementById('size-val').textContent = gridSize;
+    doGenerate();
+  });
+});
+
+document.getElementById('btn-generate').addEventListener('click', doGenerate);
+
+function doGenerate() {
+  if (animating) { animating = false; }
+  const algo = document.getElementById('gen-algo').value;
+  resizeCanvas();
+  generateMaze(algo);
+  setStartEnd();
+  renderMaze();
+  updateStats(0, 0, null);
+  document.getElementById('race-results').style.display = 'none';
+}
+
+document.getElementById('btn-solve').addEventListener('click', async () => {
+  if (animating) return;
+  clearSolution();
+  renderMaze();
+  animating = true;
+
+  const algo = document.getElementById('solve-algo').value;
+  const startTime = performance.now();
+  const result = solve(algo);
+  const solveTime = Math.round(performance.now() - startTime);
+
+  const done = await animateSolve(result, (explored, pathLen) => {
+    updateStats(explored, pathLen || '—', null);
+  });
+
+  animating = false;
+  if (done) {
+    updateStats(result.visited.length, result.path.length, solveTime);
+  }
+});
+
+document.getElementById('btn-race').addEventListener('click', async () => {
+  if (animating) return;
+
+  const savedGrid = grid.map(r => r.slice());
+  const algos = [
+    { id: 'astar', name: 'A* Search' },
+    { id: 'bfs', name: 'Breadth-First Search' },
+    { id: 'dfs-solve', name: 'Depth-First Search' },
+    { id: 'dijkstra', name: "Dijkstra's Algorithm" },
+    { id: 'greedy', name: 'Greedy Best-First' },
+    { id: 'wall-follower', name: 'Wall Follower' }
+  ];
+
+  const results = [];
+  for (const algo of algos) {
+    grid = savedGrid.map(r => r.slice());
+    setStartEnd();
+    const t0 = performance.now();
+    const result = solve(algo.id);
+    const time = Math.round(performance.now() - t0);
+    results.push({
+      name: algo.name,
+      explored: result.visited.length,
+      pathLen: result.path.length,
+      time
+    });
+  }
+
+  results.sort((a, b) => a.pathLen - b.pathLen || a.explored - b.explored);
+
+  const colors = ['#ffd700', '#c0c0c0', '#cd7f32', '#aaa', '#888', '#666'];
+  const rankEmoji = ['🥇', '🥈', '🥉', '4.', '5.', '6.'];
+  const rowsHTML = results.map((r, i) =>
+    `<div class="race-result-row">
+      <span class="race-rank" style="color:${colors[i]}">${rankEmoji[i]}</span>
+      <span class="race-name">${r.name}</span>
+      <span class="race-steps">${r.explored} explored</span>
+      <span class="race-path">${r.pathLen} path</span>
+    </div>`
+  ).join('');
+
+  document.getElementById('race-rows').innerHTML = rowsHTML;
+  document.getElementById('race-results').style.display = 'block';
+
+  grid = savedGrid.map(r => r.slice());
+  setStartEnd();
+
+  animating = true;
+  const bestAlgo = results[0];
+  const bestId = algos.find(a => a.name === bestAlgo.name).id;
+  const bestResult = solve(bestId);
+  await animateSolve(bestResult, (explored, pathLen) => {
+    updateStats(explored, pathLen || '—', null);
+  });
+  animating = false;
+  updateStats(bestResult.visited.length, bestResult.path.length, bestAlgo.time);
+});
+
+document.getElementById('race-close-btn').addEventListener('click', () => {
+  document.getElementById('race-results').style.display = 'none';
+});
+
+updateLegend();
+doGenerate();
+</script>
+</body>
+</html>
