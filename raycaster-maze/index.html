@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raycaster Maze</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    cursor: crosshair;
+  }
+  canvas { display: block; }
+  #ui {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .panel {
+    background: rgba(0,0,0,0.75);
+    border: 1px solid rgba(100,255,100,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #7fff7f;
+    font-size: 13px;
+    backdrop-filter: blur(8px);
+  }
+  .panel h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #5fdf5f;
+    margin-bottom: 6px;
+  }
+  #minimap-container {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 10;
+    background: rgba(0,0,0,0.8);
+    border: 1px solid rgba(100,255,100,0.3);
+    border-radius: 8px;
+    padding: 8px;
+    backdrop-filter: blur(8px);
+  }
+  #minimap { display: block; }
+  #controls-hint {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    z-index: 10;
+  }
+  .hint-key {
+    display: inline-block;
+    background: rgba(100,255,100,0.15);
+    border: 1px solid rgba(100,255,100,0.3);
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 1px 2px;
+    font-size: 11px;
+    color: #7fff7f;
+  }
+  #crosshair {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    pointer-events: none;
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(100,255,100,0.5);
+  }
+  #crosshair::before {
+    width: 20px;
+    height: 2px;
+    top: -1px;
+    left: -10px;
+  }
+  #crosshair::after {
+    width: 2px;
+    height: 20px;
+    top: -10px;
+    left: -1px;
+  }
+  #start-screen {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #7fff7f;
+    text-align: center;
+    cursor: pointer;
+  }
+  #start-screen h1 {
+    font-size: 48px;
+    letter-spacing: 4px;
+    text-shadow: 0 0 30px rgba(100,255,100,0.4);
+    margin-bottom: 16px;
+  }
+  #start-screen p {
+    font-size: 16px;
+    color: #5fdf5f;
+    margin-bottom: 30px;
+  }
+  .start-btn {
+    padding: 14px 40px;
+    font-size: 18px;
+    font-family: inherit;
+    background: rgba(100,255,100,0.12);
+    border: 2px solid #7fff7f;
+    color: #7fff7f;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all 0.3s;
+  }
+  .start-btn:hover {
+    background: rgba(100,255,100,0.25);
+    box-shadow: 0 0 20px rgba(100,255,100,0.3);
+  }
+  #victory-screen {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ffdf00;
+    text-align: center;
+  }
+  #victory-screen h1 {
+    font-size: 52px;
+    text-shadow: 0 0 30px rgba(255,223,0,0.5);
+    margin-bottom: 16px;
+  }
+  #settings-panel {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .setting-row label {
+    font-size: 11px;
+    color: #5fdf5f;
+  }
+  .setting-row select, .setting-row input[type="range"] {
+    background: rgba(100,255,100,0.1);
+    border: 1px solid rgba(100,255,100,0.3);
+    color: #7fff7f;
+    font-family: inherit;
+    font-size: 11px;
+    border-radius: 4px;
+    padding: 2px 4px;
+    outline: none;
+  }
+  .setting-row input[type="range"] {
+    width: 80px;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(100,255,100,0.2);
+  }
+  .setting-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #7fff7f;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>RAYCASTER MAZE</h1>
+  <p>Explore procedurally generated mazes in retro first-person 3D</p>
+  <button class="start-btn" id="start-btn">CLICK TO START</button>
+  <p style="margin-top:20px;font-size:12px;color:#3a8a3a">WASD / Arrows to move &middot; Mouse to look &middot; Find the exit!</p>
+</div>
+
+<div id="victory-screen">
+  <h1>MAZE COMPLETE!</h1>
+  <p id="victory-stats" style="font-size:18px;color:#ffdf00;margin-bottom:24px"></p>
+  <button class="start-btn" id="restart-btn" style="border-color:#ffdf00;color:#ffdf00">NEXT MAZE</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<div id="ui">
+  <div class="panel">
+    <h3>Status</h3>
+    <div id="stats">FPS: --</div>
+  </div>
+</div>
+
+<div id="settings-panel">
+  <div class="panel">
+    <h3>Settings</h3>
+    <div class="setting-row">
+      <label>Maze Size</label>
+      <select id="maze-size">
+        <option value="8">8×8</option>
+        <option value="12" selected>12×12</option>
+        <option value="16">16×16</option>
+        <option value="24">24×24</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>Fog</label>
+      <input type="range" id="fog-range" min="0" max="100" value="60">
+    </div>
+    <div class="setting-row">
+      <label>Theme</label>
+      <select id="theme-select">
+        <option value="dungeon">Dungeon</option>
+        <option value="neon">Neon</option>
+        <option value="hell">Inferno</option>
+        <option value="ice">Ice Cave</option>
+        <option value="void">Void</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div id="minimap-container">
+  <canvas id="minimap" width="160" height="160"></canvas>
+</div>
+
+<div id="controls-hint">
+  <div class="panel">
+    <span class="hint-key">W</span><span class="hint-key">A</span><span class="hint-key">S</span><span class="hint-key">D</span> Move
+    &nbsp;
+    <span class="hint-key">Mouse</span> Look
+    &nbsp;
+    <span class="hint-key">Shift</span> Sprint
+  </div>
+</div>
+
+<div id="crosshair"></div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const themes = {
+  dungeon: {
+    wall1: [80, 70, 60],
+    wall2: [60, 50, 40],
+    floor: [30, 28, 25],
+    ceiling: [15, 14, 12],
+    fog: [0, 0, 0],
+    exit: [255, 215, 0],
+    miniWall: '#554433',
+    miniFloor: '#1a1816',
+  },
+  neon: {
+    wall1: [20, 80, 180],
+    wall2: [180, 20, 120],
+    floor: [10, 10, 30],
+    ceiling: [5, 5, 15],
+    fog: [0, 0, 10],
+    exit: [0, 255, 200],
+    miniWall: '#1450b4',
+    miniFloor: '#0a0a1e',
+  },
+  hell: {
+    wall1: [140, 30, 10],
+    wall2: [100, 20, 5],
+    floor: [40, 10, 5],
+    ceiling: [60, 15, 5],
+    fog: [10, 0, 0],
+    exit: [255, 200, 50],
+    miniWall: '#8c1e0a',
+    miniFloor: '#280a05',
+  },
+  ice: {
+    wall1: [120, 170, 200],
+    wall2: [80, 140, 180],
+    floor: [30, 50, 60],
+    ceiling: [20, 35, 45],
+    fog: [10, 15, 20],
+    exit: [255, 255, 100],
+    miniWall: '#78aac8',
+    miniFloor: '#1e323c',
+  },
+  void: {
+    wall1: [60, 20, 80],
+    wall2: [40, 10, 60],
+    floor: [8, 5, 12],
+    ceiling: [5, 2, 8],
+    fog: [2, 0, 5],
+    exit: [200, 100, 255],
+    miniWall: '#3c1450',
+    miniFloor: '#08050c',
+  },
+};
+
+let currentTheme = 'dungeon';
+let fogDensity = 0.6;
+let mazeW = 12, mazeH = 12;
+let map = [];
+let exitX = 0, exitZ = 0;
+
+function generateMaze(w, h) {
+  const grid = [];
+  const mw = w * 2 + 1;
+  const mh = h * 2 + 1;
+  for (let y = 0; y < mh; y++) {
+    grid[y] = [];
+    for (let x = 0; x < mw; x++) {
+      grid[y][x] = 1;
+    }
+  }
+
+  const visited = [];
+  for (let y = 0; y < h; y++) {
+    visited[y] = [];
+    for (let x = 0; x < w; x++) {
+      visited[y][x] = false;
+    }
+  }
+
+  const stack = [];
+  const startCellX = 0, startCellY = 0;
+  visited[startCellY][startCellX] = true;
+  grid[startCellY * 2 + 1][startCellX * 2 + 1] = 0;
+  stack.push([startCellX, startCellY]);
+
+  while (stack.length > 0) {
+    const [cx, cy] = stack[stack.length - 1];
+    const neighbors = [];
+    const dirs = [[0,-1],[1,0],[0,1],[-1,0]];
+    for (const [dx, dy] of dirs) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx >= 0 && nx < w && ny >= 0 && ny < h && !visited[ny][nx]) {
+        neighbors.push([nx, ny, dx, dy]);
+      }
+    }
+    if (neighbors.length === 0) {
+      stack.pop();
+    } else {
+      const [nx, ny, dx, dy] = neighbors[Math.floor(Math.random() * neighbors.length)];
+      visited[ny][nx] = true;
+      grid[cy * 2 + 1 + dy][cx * 2 + 1 + dx] = 0;
+      grid[ny * 2 + 1][nx * 2 + 1] = 0;
+      stack.push([nx, ny]);
+    }
+  }
+
+  exitX = (w - 1) * 2 + 1;
+  exitZ = (h - 1) * 2 + 1;
+  grid[exitZ][exitX] = 2;
+
+  return { grid, width: mw, height: mh };
+}
+
+let mapWidth, mapHeight;
+
+function initMaze() {
+  const result = generateMaze(mazeW, mazeH);
+  map = result.grid;
+  mapWidth = result.width;
+  mapHeight = result.height;
+
+  player.x = 1.5;
+  player.z = 1.5;
+  player.angle = 0;
+  startTime = performance.now();
+  steps = 0;
+}
+
+const player = {
+  x: 1.5,
+  z: 1.5,
+  angle: 0,
+  pitch: 0,
+  moveSpeed: 0.04,
+  rotSpeed: 0.003,
+  radius: 0.2,
+};
+
+let startTime = 0;
+let steps = 0;
+
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+let isLocked = false;
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('start-screen').style.display = 'none';
+  initMaze();
+  canvas.requestPointerLock();
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  document.getElementById('victory-screen').style.display = 'none';
+  mazeW = parseInt(document.getElementById('maze-size').value);
+  mazeH = mazeW;
+  initMaze();
+  canvas.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+  isLocked = document.pointerLockElement === canvas;
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isLocked) return;
+  player.angle += e.movementX * player.rotSpeed;
+  player.pitch -= e.movementY * player.rotSpeed * 0.5;
+  player.pitch = Math.max(-1, Math.min(1, player.pitch));
+});
+
+canvas.addEventListener('click', () => {
+  if (!isLocked && document.getElementById('start-screen').style.display === 'none' &&
+      document.getElementById('victory-screen').style.display === 'none') {
+    canvas.requestPointerLock();
+  }
+});
+
+document.getElementById('theme-select').addEventListener('change', e => {
+  currentTheme = e.target.value;
+});
+
+document.getElementById('fog-range').addEventListener('input', e => {
+  fogDensity = e.target.value / 100;
+});
+
+document.getElementById('maze-size').addEventListener('change', e => {
+  mazeW = parseInt(e.target.value);
+  mazeH = mazeW;
+});
+
+function isWall(x, z) {
+  const gx = Math.floor(x);
+  const gz = Math.floor(z);
+  if (gx < 0 || gx >= mapWidth || gz < 0 || gz >= mapHeight) return true;
+  return map[gz][gx] === 1;
+}
+
+function movePlayer() {
+  const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? player.moveSpeed * 1.8 : player.moveSpeed;
+  let dx = 0, dz = 0;
+  const cos = Math.cos(player.angle);
+  const sin = Math.sin(player.angle);
+
+  if (keys['KeyW'] || keys['ArrowUp']) { dx += cos * speed; dz += sin * speed; steps++; }
+  if (keys['KeyS'] || keys['ArrowDown']) { dx -= cos * speed; dz -= sin * speed; steps++; }
+  if (keys['KeyA'] || keys['ArrowLeft']) { dx += sin * speed; dz -= cos * speed; }
+  if (keys['KeyD'] || keys['ArrowRight']) { dx -= sin * speed; dz += cos * speed; }
+
+  if (!keys['ArrowUp'] && !keys['ArrowDown'] && !keys['KeyW'] && !keys['KeyS']) {
+    if (keys['ArrowLeft']) player.angle -= player.rotSpeed * 3;
+    if (keys['ArrowRight']) player.angle += player.rotSpeed * 3;
+  }
+
+  const r = player.radius;
+  if (!isWall(player.x + dx + r * Math.sign(dx), player.z)) player.x += dx;
+  if (!isWall(player.x, player.z + dz + r * Math.sign(dz))) player.z += dz;
+
+  const gx = Math.floor(player.x);
+  const gz = Math.floor(player.z);
+  if (gx >= 0 && gx < mapWidth && gz >= 0 && gz < mapHeight && map[gz][gx] === 2) {
+    victory();
+  }
+}
+
+function victory() {
+  document.exitPointerLock();
+  const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+  document.getElementById('victory-stats').textContent =
+    `Time: ${elapsed}s · Maze: ${mazeW}×${mazeH}`;
+  document.getElementById('victory-screen').style.display = 'flex';
+}
+
+function castRay(angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+
+  let tMaxX, tMaxY, tDeltaX, tDeltaY, stepX, stepY;
+  let mapX = Math.floor(player.x);
+  let mapY = Math.floor(player.z);
+
+  if (cos > 0) {
+    stepX = 1;
+    tMaxX = (mapX + 1 - player.x) / cos;
+    tDeltaX = 1 / cos;
+  } else if (cos < 0) {
+    stepX = -1;
+    tMaxX = (mapX - player.x) / cos;
+    tDeltaX = -1 / cos;
+  } else {
+    stepX = 0;
+    tMaxX = Infinity;
+    tDeltaX = Infinity;
+  }
+
+  if (sin > 0) {
+    stepY = 1;
+    tMaxY = (mapY + 1 - player.z) / sin;
+    tDeltaY = 1 / sin;
+  } else if (sin < 0) {
+    stepY = -1;
+    tMaxY = (mapY - player.z) / sin;
+    tDeltaY = -1 / sin;
+  } else {
+    stepY = 0;
+    tMaxY = Infinity;
+    tDeltaY = Infinity;
+  }
+
+  let side = 0;
+  const maxDist = 30;
+
+  for (let i = 0; i < 200; i++) {
+    if (tMaxX < tMaxY) {
+      mapX += stepX;
+      if (tMaxX > maxDist) return { dist: maxDist, side: 0, cell: 0, texX: 0 };
+      if (mapX < 0 || mapX >= mapWidth || mapY < 0 || mapY >= mapHeight) return { dist: tMaxX, side: 0, cell: 1, texX: 0 };
+      if (map[mapY][mapX] >= 1) {
+        const hitZ = player.z + sin * tMaxX;
+        return { dist: tMaxX, side: 0, cell: map[mapY][mapX], texX: hitZ - Math.floor(hitZ) };
+      }
+      tMaxX += tDeltaX;
+    } else {
+      mapY += stepY;
+      if (tMaxY > maxDist) return { dist: maxDist, side: 1, cell: 0, texX: 0 };
+      if (mapX < 0 || mapX >= mapWidth || mapY < 0 || mapY >= mapHeight) return { dist: tMaxY, side: 1, cell: 1, texX: 0 };
+      if (map[mapY][mapX] >= 1) {
+        const hitX = player.x + cos * tMaxY;
+        return { dist: tMaxY, side: 1, cell: map[mapY][mapX], texX: hitX - Math.floor(hitX) };
+      }
+      tMaxY += tDeltaY;
+    }
+  }
+
+  return { dist: maxDist, side: 0, cell: 0, texX: 0 };
+}
+
+function generateTexture(baseColor, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const cx = c.getContext('2d');
+  const [r, g, b] = baseColor;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const noise = (Math.random() - 0.5) * 20;
+      const brickX = (x % 32 < 1) ? -30 : 0;
+      const brickRow = Math.floor(y / 16);
+      const brickOffset = brickRow % 2 === 0 ? 0 : 16;
+      const brickY = ((y + brickOffset) % 16 < 1) ? -30 : 0;
+      const v = noise + brickX + brickY;
+      cx.fillStyle = `rgb(${Math.max(0,Math.min(255, r + v))},${Math.max(0,Math.min(255, g + v))},${Math.max(0,Math.min(255, b + v))})`;
+      cx.fillRect(x, y, 1, 1);
+    }
+  }
+  return c;
+}
+
+const textureCache = {};
+function getTexture(themeName) {
+  if (!textureCache[themeName]) {
+    const t = themes[themeName];
+    textureCache[themeName] = {
+      wall1: generateTexture(t.wall1, 64),
+      wall2: generateTexture(t.wall2, 64),
+    };
+  }
+  return textureCache[themeName];
+}
+
+const FOV = Math.PI / 3;
+const HALF_FOV = FOV / 2;
+
+function render() {
+  const theme = themes[currentTheme];
+  const textures = getTexture(currentTheme);
+
+  ctx.fillStyle = `rgb(${theme.ceiling[0]},${theme.ceiling[1]},${theme.ceiling[2]})`;
+  ctx.fillRect(0, 0, W, H / 2);
+  ctx.fillStyle = `rgb(${theme.floor[0]},${theme.floor[1]},${theme.floor[2]})`;
+  ctx.fillRect(0, H / 2, W, H / 2);
+
+  const pitchOffset = player.pitch * H * 0.3;
+
+  const numRays = Math.min(W, 960);
+  const stripWidth = W / numRays;
+
+  for (let i = 0; i < numRays; i++) {
+    const rayAngle = player.angle - HALF_FOV + (i / numRays) * FOV;
+    const hit = castRay(rayAngle);
+    const perpDist = hit.dist * Math.cos(rayAngle - player.angle);
+
+    const wallHeight = H / perpDist;
+    const drawStart = (H - wallHeight) / 2 + pitchOffset;
+    const drawEnd = drawStart + wallHeight;
+
+    const fogFactor = Math.min(1, perpDist * fogDensity / 10);
+
+    if (hit.cell === 2) {
+      const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 300);
+      const er = theme.exit[0] * pulse;
+      const eg = theme.exit[1] * pulse;
+      const eb = theme.exit[2] * pulse;
+      const fr = er + (theme.fog[0] - er) * fogFactor;
+      const fg = eg + (theme.fog[1] - eg) * fogFactor;
+      const fb = eb + (theme.fog[2] - eb) * fogFactor;
+      ctx.fillStyle = `rgb(${fr|0},${fg|0},${fb|0})`;
+      ctx.fillRect(i * stripWidth, drawStart, stripWidth + 1, wallHeight);
+    } else if (hit.cell === 1) {
+      const tex = hit.side === 0 ? textures.wall1 : textures.wall2;
+      const texX = Math.floor(hit.texX * 64) % 64;
+      const shade = hit.side === 1 ? 0.7 : 1.0;
+
+      const srcY = 0;
+      const srcH = 64;
+
+      ctx.drawImage(tex, texX, srcY, 1, srcH,
+                    i * stripWidth, drawStart, stripWidth + 1, wallHeight);
+
+      if (shade < 1 || fogFactor > 0) {
+        const alpha = Math.min(1, (1 - shade) * 0.3 + fogFactor * 0.9);
+        ctx.fillStyle = `rgba(${theme.fog[0]},${theme.fog[1]},${theme.fog[2]},${alpha})`;
+        ctx.fillRect(i * stripWidth, drawStart, stripWidth + 1, wallHeight);
+      }
+    }
+
+    const floorFog = Math.min(0.85, fogFactor * 0.7);
+    if (floorFog > 0) {
+      ctx.fillStyle = `rgba(${theme.fog[0]},${theme.fog[1]},${theme.fog[2]},${floorFog})`;
+      const floorTop = Math.max(drawEnd, H / 2 + pitchOffset);
+      ctx.fillRect(i * stripWidth, floorTop, stripWidth + 1, H - floorTop);
+      const ceilBot = Math.min(drawStart, H / 2 + pitchOffset);
+      ctx.fillRect(i * stripWidth, 0, stripWidth + 1, ceilBot);
+    }
+  }
+}
+
+function renderMinimap() {
+  const size = 160;
+  const viewRadius = 6;
+  const cellSize = size / (viewRadius * 2 + 1);
+  const theme = themes[currentTheme];
+
+  minimapCtx.fillStyle = theme.miniFloor;
+  minimapCtx.fillRect(0, 0, size, size);
+
+  for (let dy = -viewRadius; dy <= viewRadius; dy++) {
+    for (let dx = -viewRadius; dx <= viewRadius; dx++) {
+      const mx = Math.floor(player.x) + dx;
+      const mz = Math.floor(player.z) + dy;
+      const sx = (dx + viewRadius) * cellSize;
+      const sy = (dy + viewRadius) * cellSize;
+
+      if (mx >= 0 && mx < mapWidth && mz >= 0 && mz < mapHeight) {
+        if (map[mz][mx] === 1) {
+          minimapCtx.fillStyle = theme.miniWall;
+          minimapCtx.fillRect(sx, sy, cellSize, cellSize);
+        } else if (map[mz][mx] === 2) {
+          const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+          minimapCtx.fillStyle = `rgba(${theme.exit[0]},${theme.exit[1]},${theme.exit[2]},${pulse})`;
+          minimapCtx.fillRect(sx, sy, cellSize, cellSize);
+        }
+      } else {
+        minimapCtx.fillStyle = theme.miniWall;
+        minimapCtx.fillRect(sx, sy, cellSize, cellSize);
+      }
+    }
+  }
+
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const px = centerX + (player.x - Math.floor(player.x) - 0.5) * cellSize;
+  const py = centerY + (player.z - Math.floor(player.z) - 0.5) * cellSize;
+
+  minimapCtx.save();
+  minimapCtx.translate(px, py);
+  minimapCtx.rotate(player.angle);
+  minimapCtx.fillStyle = '#7fff7f';
+  minimapCtx.beginPath();
+  minimapCtx.moveTo(6, 0);
+  minimapCtx.lineTo(-4, -4);
+  minimapCtx.lineTo(-4, 4);
+  minimapCtx.closePath();
+  minimapCtx.fill();
+  minimapCtx.restore();
+
+  const fovLen = cellSize * 4;
+  minimapCtx.strokeStyle = 'rgba(127,255,127,0.3)';
+  minimapCtx.lineWidth = 1;
+  minimapCtx.beginPath();
+  minimapCtx.moveTo(px, py);
+  minimapCtx.lineTo(px + Math.cos(player.angle - HALF_FOV) * fovLen,
+                     py + Math.sin(player.angle - HALF_FOV) * fovLen);
+  minimapCtx.moveTo(px, py);
+  minimapCtx.lineTo(px + Math.cos(player.angle + HALF_FOV) * fovLen,
+                     py + Math.sin(player.angle + HALF_FOV) * fovLen);
+  minimapCtx.stroke();
+}
+
+let frameCount = 0;
+let lastFpsTime = 0;
+let fps = 0;
+
+function gameLoop(timestamp) {
+  frameCount++;
+  if (timestamp - lastFpsTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastFpsTime = timestamp;
+  }
+
+  if (document.getElementById('start-screen').style.display === 'none' &&
+      document.getElementById('victory-screen').style.display === 'none') {
+    movePlayer();
+  }
+
+  render();
+  renderMinimap();
+
+  const elapsed = ((performance.now() - startTime) / 1000).toFixed(0);
+  document.getElementById('stats').innerHTML =
+    `FPS: ${fps}<br>Time: ${elapsed}s<br>Maze: ${mazeW}×${mazeH}`;
+
+  requestAnimationFrame(gameLoop);
+}
+
+initMaze();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

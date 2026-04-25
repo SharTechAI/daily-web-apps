@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magnetic Field Visualizer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a12;
+  color: #e0e0f0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+canvas {
+  flex: 1;
+  display: block;
+  cursor: crosshair;
+}
+
+.toolbar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  background: rgba(16, 16, 26, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 8px 12px;
+  z-index: 10;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.toolbar button, .toolbar select {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #c8c8e0;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.toolbar button:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.toolbar button.active {
+  background: rgba(100, 120, 255, 0.3);
+  border-color: rgba(100, 120, 255, 0.5);
+  color: #fff;
+}
+
+.toolbar .sep {
+  width: 1px;
+  height: 28px;
+  background: rgba(255,255,255,0.1);
+  margin: 0 4px;
+}
+
+.toolbar label {
+  font-size: 0.75rem;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar input[type="range"] {
+  width: 80px;
+  accent-color: #6478ff;
+}
+
+.panel {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  background: rgba(16, 16, 26, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px 18px;
+  z-index: 10;
+  font-size: 0.78rem;
+  color: #888;
+  line-height: 1.8;
+  max-width: 260px;
+}
+
+.panel kbd {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  color: #aaa;
+}
+
+.panel strong { color: #c0c0d8; }
+
+.magnet-info {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(16, 16, 26, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px 18px;
+  z-index: 10;
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.magnet-info .count {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #6478ff;
+}
+
+@media (max-width: 700px) {
+  .toolbar { top: 8px; padding: 6px 8px; gap: 4px; }
+  .toolbar button { padding: 5px 10px; font-size: 0.72rem; }
+  .panel { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button id="btn-place" class="active" title="Click to place magnets">🧲 Place</button>
+  <button id="btn-move" title="Click and drag magnets">✋ Move</button>
+  <div class="sep"></div>
+  <button id="btn-north" class="active" title="North pole (red)">🔴 N</button>
+  <button id="btn-south" title="South pole (blue)">🔵 S</button>
+  <button id="btn-dipole" title="Place a dipole pair">⬛ Dipole</button>
+  <div class="sep"></div>
+  <label>Strength <input type="range" id="sl-strength" min="1" max="20" value="8"></label>
+  <label>Density <input type="range" id="sl-density" min="1" max="5" value="3"></label>
+  <div class="sep"></div>
+  <select id="sel-viz">
+    <option value="lines">Field Lines</option>
+    <option value="arrows">Arrow Field</option>
+    <option value="heatmap">Heatmap</option>
+    <option value="combined">Lines + Arrows</option>
+  </select>
+  <select id="sel-color">
+    <option value="classic">Classic</option>
+    <option value="thermal">Thermal</option>
+    <option value="neon">Neon</option>
+    <option value="monochrome">Monochrome</option>
+    <option value="aurora">Aurora</option>
+  </select>
+  <div class="sep"></div>
+  <button id="btn-clear" title="Clear all magnets">🗑️ Clear</button>
+  <button id="btn-preset" title="Load a preset">📐 Presets</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="panel">
+  <strong>Controls</strong><br>
+  <kbd>Click</kbd> Place magnet<br>
+  <kbd>Drag</kbd> Move magnet<br>
+  <kbd>Right-click</kbd> Delete magnet<br>
+  <kbd>Scroll</kbd> Adjust strength<br>
+  <kbd>F</kbd> Flip polarity<br>
+  <kbd>Space</kbd> Toggle animation
+</div>
+
+<div class="magnet-info">
+  <div class="count" id="magnet-count">0</div>
+  magnets placed
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const magnets = [];
+let mode = 'place';
+let poleType = 'north';
+let vizMode = 'lines';
+let colorScheme = 'classic';
+let strengthVal = 8;
+let densityVal = 3;
+let dragging = null;
+let dragOffset = { x: 0, y: 0 };
+let hoveredMagnet = null;
+let animating = true;
+let animPhase = 0;
+let presetIndex = 0;
+
+const presets = [
+  { name: 'Dipole', magnets: [
+    { x: 0.35, y: 0.5, pole: 'north', strength: 10 },
+    { x: 0.65, y: 0.5, pole: 'south', strength: 10 }
+  ]},
+  { name: 'Quadrupole', magnets: [
+    { x: 0.35, y: 0.35, pole: 'north', strength: 8 },
+    { x: 0.65, y: 0.35, pole: 'south', strength: 8 },
+    { x: 0.35, y: 0.65, pole: 'south', strength: 8 },
+    { x: 0.65, y: 0.65, pole: 'north', strength: 8 }
+  ]},
+  { name: 'Ring', magnets: (() => {
+    const r = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      r.push({
+        x: 0.5 + Math.cos(a) * 0.22,
+        y: 0.5 + Math.sin(a) * 0.22,
+        pole: i % 2 === 0 ? 'north' : 'south',
+        strength: 6
+      });
+    }
+    return r;
+  })()},
+  { name: 'Solenoid', magnets: (() => {
+    const r = [];
+    for (let i = 0; i < 6; i++) {
+      r.push({ x: 0.25 + i * 0.1, y: 0.5, pole: 'north', strength: 5 });
+    }
+    return r;
+  })()},
+  { name: 'Chaos', magnets: (() => {
+    const r = [];
+    for (let i = 0; i < 12; i++) {
+      r.push({
+        x: 0.15 + Math.random() * 0.7,
+        y: 0.15 + Math.random() * 0.7,
+        pole: Math.random() > 0.5 ? 'north' : 'south',
+        strength: 3 + Math.random() * 10
+      });
+    }
+    return r;
+  })()},
+  { name: 'Helmholtz Coils', magnets: (() => {
+    const r = [];
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI - Math.PI / 2;
+      r.push({ x: 0.3 + Math.cos(a) * 0.08, y: 0.5 + Math.sin(a) * 0.2, pole: 'north', strength: 6 });
+    }
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI - Math.PI / 2;
+      r.push({ x: 0.7 + Math.cos(a) * 0.08, y: 0.5 + Math.sin(a) * 0.2, pole: 'north', strength: 6 });
+    }
+    return r;
+  })()}
+];
+
+function computeField(px, py) {
+  let bx = 0, by = 0;
+  for (const m of magnets) {
+    const dx = px - m.x;
+    const dy = py - m.y;
+    const r2 = dx * dx + dy * dy;
+    const r = Math.sqrt(r2);
+    if (r < 8) continue;
+    const r3 = r2 * r;
+    const sign = m.pole === 'north' ? 1 : -1;
+    const s = m.strength * sign * 500;
+    bx += s * dx / r3;
+    by += s * dy / r3;
+  }
+  return { x: bx, y: by };
+}
+
+function fieldMagnitude(px, py) {
+  const f = computeField(px, py);
+  return Math.sqrt(f.x * f.x + f.y * f.y);
+}
+
+function getColor(magnitude, t) {
+  const m = Math.min(magnitude * 0.3, 1);
+  switch (colorScheme) {
+    case 'classic': {
+      const r = Math.floor(80 + m * 175);
+      const g = Math.floor(40 + (1 - m) * 100);
+      const b = Math.floor(200 - m * 100);
+      return `rgba(${r},${g},${b},${0.3 + m * 0.5})`;
+    }
+    case 'thermal': {
+      const r = Math.floor(m * 255);
+      const g = Math.floor(m * m * 200);
+      const b = Math.floor((1 - m) * 120);
+      return `rgba(${r},${g},${b},${0.3 + m * 0.5})`;
+    }
+    case 'neon': {
+      const phase = t || 0;
+      const r = Math.floor(128 + 127 * Math.sin(m * 4 + phase));
+      const g = Math.floor(128 + 127 * Math.sin(m * 4 + phase + 2.1));
+      const b = Math.floor(128 + 127 * Math.sin(m * 4 + phase + 4.2));
+      return `rgba(${r},${g},${b},${0.4 + m * 0.5})`;
+    }
+    case 'monochrome': {
+      const v = Math.floor(60 + m * 180);
+      return `rgba(${v},${v},${Math.floor(v * 1.1)},${0.3 + m * 0.5})`;
+    }
+    case 'aurora': {
+      const r = Math.floor(20 + m * 60);
+      const g = Math.floor(180 * m + 80 * (1 - m));
+      const b = Math.floor(100 + m * 155);
+      return `rgba(${r},${g},${b},${0.35 + m * 0.5})`;
+    }
+    default: return `rgba(100,120,255,${0.3 + m * 0.5})`;
+  }
+}
+
+function drawFieldLines() {
+  if (magnets.length === 0) return;
+  const numLines = [8, 12, 18, 24, 32][densityVal - 1];
+  const stepSize = 3;
+  const maxSteps = 400;
+
+  for (const m of magnets) {
+    const sign = m.pole === 'north' ? 1 : -1;
+    for (let i = 0; i < numLines; i++) {
+      const angle = (i / numLines) * Math.PI * 2;
+      let px = m.x + Math.cos(angle) * 14;
+      let py = m.y + Math.sin(angle) * 14;
+
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+
+      let prevMag = 0;
+      for (let s = 0; s < maxSteps; s++) {
+        const f = computeField(px, py);
+        const mag = Math.sqrt(f.x * f.x + f.y * f.y);
+        if (mag < 0.001) break;
+
+        const nx = f.x / mag * sign;
+        const ny = f.y / mag * sign;
+
+        px += nx * stepSize;
+        py += ny * stepSize;
+
+        if (px < -20 || px > W + 20 || py < -20 || py > H + 20) break;
+
+        let hitMagnet = false;
+        for (const m2 of magnets) {
+          if (m2 === m && s < 10) continue;
+          const d = Math.sqrt((px - m2.x) ** 2 + (py - m2.y) ** 2);
+          if (d < 12) { hitMagnet = true; break; }
+        }
+
+        ctx.lineTo(px, py);
+
+        if (hitMagnet) break;
+        prevMag = mag;
+      }
+
+      const baseMag = fieldMagnitude(m.x, m.y);
+      ctx.strokeStyle = getColor(baseMag * 0.01, animPhase + i * 0.3);
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  }
+}
+
+function drawArrowField() {
+  const spacing = [60, 45, 35, 28, 22][densityVal - 1];
+  const arrowLen = spacing * 0.35;
+
+  for (let x = spacing / 2; x < W; x += spacing) {
+    for (let y = spacing / 2; y < H; y += spacing) {
+      const f = computeField(x, y);
+      const mag = Math.sqrt(f.x * f.x + f.y * f.y);
+      if (mag < 0.001) continue;
+
+      const nx = f.x / mag;
+      const ny = f.y / mag;
+      const len = Math.min(arrowLen, mag * arrowLen * 0.5);
+
+      const ex = x + nx * len;
+      const ey = y + ny * len;
+
+      ctx.beginPath();
+      ctx.moveTo(x - nx * len * 0.3, y - ny * len * 0.3);
+      ctx.lineTo(ex, ey);
+      ctx.strokeStyle = getColor(mag * 0.15, animPhase);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      const headLen = len * 0.4;
+      const angle = Math.atan2(ny, nx);
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - headLen * Math.cos(angle - 0.4), ey - headLen * Math.sin(angle - 0.4));
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - headLen * Math.cos(angle + 0.4), ey - headLen * Math.sin(angle + 0.4));
+      ctx.stroke();
+    }
+  }
+}
+
+function drawHeatmap() {
+  const step = 6;
+  for (let x = 0; x < W; x += step) {
+    for (let y = 0; y < H; y += step) {
+      const mag = fieldMagnitude(x, y);
+      const intensity = Math.min(mag * 0.2, 1);
+      if (intensity < 0.01) continue;
+      ctx.fillStyle = getColor(intensity * 3.3, animPhase);
+      ctx.fillRect(x, y, step, step);
+    }
+  }
+}
+
+function drawMagnets() {
+  for (const m of magnets) {
+    const isN = m.pole === 'north';
+    const glow = m === hoveredMagnet ? 25 : 15;
+
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, glow, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, glow);
+    grad.addColorStop(0, isN ? 'rgba(255,60,60,0.4)' : 'rgba(60,60,255,0.4)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = isN ? '#e03030' : '#3030e0';
+    ctx.fill();
+    ctx.strokeStyle = isN ? '#ff6060' : '#6060ff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isN ? 'N' : 'S', m.x, m.y + 0.5);
+
+    if (m === hoveredMagnet) {
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 18, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px system-ui';
+      ctx.fillText(`s=${m.strength.toFixed(1)}`, m.x, m.y - 22);
+    }
+  }
+}
+
+function drawEmptyState() {
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.font = '600 22px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Click anywhere to place magnets', W / 2, H / 2 - 10);
+  ctx.font = '14px system-ui';
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.fillText('or click Presets to load a configuration', W / 2, H / 2 + 20);
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(255,255,255,0.015)';
+  ctx.lineWidth = 1;
+  const gs = 50;
+  for (let x = 0; x < W; x += gs) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  for (let y = 0; y < H; y += gs) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+}
+
+function render() {
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, W, H);
+  drawGrid();
+
+  if (magnets.length === 0) {
+    drawEmptyState();
+  } else {
+    if (vizMode === 'lines' || vizMode === 'combined') drawFieldLines();
+    if (vizMode === 'arrows' || vizMode === 'combined') drawArrowField();
+    if (vizMode === 'heatmap') {
+      drawHeatmap();
+      drawFieldLines();
+    }
+  }
+
+  drawMagnets();
+
+  if (animating) animPhase += 0.015;
+  requestAnimationFrame(render);
+}
+
+function findMagnet(x, y) {
+  for (let i = magnets.length - 1; i >= 0; i--) {
+    const m = magnets[i];
+    const d = Math.sqrt((x - m.x) ** 2 + (y - m.y) ** 2);
+    if (d < 20) return m;
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 2) {
+    const m = findMagnet(e.clientX, e.clientY);
+    if (m) {
+      magnets.splice(magnets.indexOf(m), 1);
+      document.getElementById('magnet-count').textContent = magnets.length;
+    }
+    return;
+  }
+
+  if (mode === 'move') {
+    const m = findMagnet(e.clientX, e.clientY);
+    if (m) {
+      dragging = m;
+      dragOffset.x = e.clientX - m.x;
+      dragOffset.y = e.clientY - m.y;
+      canvas.style.cursor = 'grabbing';
+    }
+    return;
+  }
+
+  if (poleType === 'dipole') {
+    magnets.push({ x: e.clientX - 25, y: e.clientY, pole: 'north', strength: strengthVal });
+    magnets.push({ x: e.clientX + 25, y: e.clientY, pole: 'south', strength: strengthVal });
+  } else {
+    magnets.push({ x: e.clientX, y: e.clientY, pole: poleType === 'north' ? 'north' : 'south', strength: strengthVal });
+  }
+  document.getElementById('magnet-count').textContent = magnets.length;
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    dragging.x = e.clientX - dragOffset.x;
+    dragging.y = e.clientY - dragOffset.y;
+    return;
+  }
+  hoveredMagnet = findMagnet(e.clientX, e.clientY);
+  canvas.style.cursor = mode === 'move'
+    ? (hoveredMagnet ? 'grab' : 'default')
+    : 'crosshair';
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (dragging) {
+    dragging = null;
+    canvas.style.cursor = mode === 'move' ? 'default' : 'crosshair';
+  }
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('wheel', e => {
+  const m = findMagnet(e.clientX, e.clientY);
+  if (m) {
+    m.strength = Math.max(1, Math.min(20, m.strength - e.deltaY * 0.01));
+    e.preventDefault();
+  }
+});
+
+let touchId = null;
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  if (mode === 'move') {
+    const m = findMagnet(t.clientX, t.clientY);
+    if (m) {
+      dragging = m;
+      dragOffset.x = t.clientX - m.x;
+      dragOffset.y = t.clientY - m.y;
+      touchId = t.identifier;
+    }
+  } else {
+    if (poleType === 'dipole') {
+      magnets.push({ x: t.clientX - 25, y: t.clientY, pole: 'north', strength: strengthVal });
+      magnets.push({ x: t.clientX + 25, y: t.clientY, pole: 'south', strength: strengthVal });
+    } else {
+      magnets.push({ x: t.clientX, y: t.clientY, pole: poleType === 'north' ? 'north' : 'south', strength: strengthVal });
+    }
+    document.getElementById('magnet-count').textContent = magnets.length;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (dragging) {
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchId) {
+        dragging.x = t.clientX - dragOffset.x;
+        dragging.y = t.clientY - dragOffset.y;
+      }
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchId) {
+      dragging = null;
+      touchId = null;
+    }
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') {
+    if (hoveredMagnet) {
+      hoveredMagnet.pole = hoveredMagnet.pole === 'north' ? 'south' : 'north';
+    }
+  }
+  if (e.key === ' ') {
+    animating = !animating;
+    e.preventDefault();
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (hoveredMagnet) {
+      magnets.splice(magnets.indexOf(hoveredMagnet), 1);
+      hoveredMagnet = null;
+      document.getElementById('magnet-count').textContent = magnets.length;
+    }
+  }
+});
+
+document.getElementById('btn-place').addEventListener('click', () => {
+  mode = 'place';
+  document.getElementById('btn-place').classList.add('active');
+  document.getElementById('btn-move').classList.remove('active');
+  canvas.style.cursor = 'crosshair';
+});
+
+document.getElementById('btn-move').addEventListener('click', () => {
+  mode = 'move';
+  document.getElementById('btn-move').classList.add('active');
+  document.getElementById('btn-place').classList.remove('active');
+  canvas.style.cursor = 'default';
+});
+
+document.getElementById('btn-north').addEventListener('click', () => {
+  poleType = 'north';
+  document.getElementById('btn-north').classList.add('active');
+  document.getElementById('btn-south').classList.remove('active');
+  document.getElementById('btn-dipole').classList.remove('active');
+});
+
+document.getElementById('btn-south').addEventListener('click', () => {
+  poleType = 'south';
+  document.getElementById('btn-south').classList.add('active');
+  document.getElementById('btn-north').classList.remove('active');
+  document.getElementById('btn-dipole').classList.remove('active');
+});
+
+document.getElementById('btn-dipole').addEventListener('click', () => {
+  poleType = 'dipole';
+  document.getElementById('btn-dipole').classList.add('active');
+  document.getElementById('btn-north').classList.remove('active');
+  document.getElementById('btn-south').classList.remove('active');
+});
+
+document.getElementById('sl-strength').addEventListener('input', e => {
+  strengthVal = +e.target.value;
+});
+
+document.getElementById('sl-density').addEventListener('input', e => {
+  densityVal = +e.target.value;
+});
+
+document.getElementById('sel-viz').addEventListener('change', e => {
+  vizMode = e.target.value;
+});
+
+document.getElementById('sel-color').addEventListener('change', e => {
+  colorScheme = e.target.value;
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  magnets.length = 0;
+  document.getElementById('magnet-count').textContent = 0;
+});
+
+document.getElementById('btn-preset').addEventListener('click', () => {
+  const preset = presets[presetIndex % presets.length];
+  magnets.length = 0;
+  for (const p of preset.magnets) {
+    magnets.push({ x: p.x * W, y: p.y * H, pole: p.pole, strength: p.strength });
+  }
+  document.getElementById('magnet-count').textContent = magnets.length;
+  presetIndex++;
+});
+
+render();
+</script>
+</body>
+</html>
