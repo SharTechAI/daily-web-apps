@@ -90,6 +90,18 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "marble-music-machine", "-l", "3470"],
       "port": 3470
+    },
+    {
+      "name": "domino-chain-reaction",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "domino-chain-reaction", "-l", "3471"],
+      "port": 3471
+    },
+    {
+      "name": "ant-colony-simulation",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "ant-colony-simulation", "-l", "3472"],
+      "port": 3472
     }
   ]
 }

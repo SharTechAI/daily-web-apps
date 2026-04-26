@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Domino Chain Reaction</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #16213e;
+  border-bottom: 1px solid #2a3a5e;
+  flex-wrap: wrap;
+  z-index: 10;
+}
+
+.toolbar h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-right: 12px;
+  background: linear-gradient(135deg, #ff6b6b, #feca57);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.btn {
+  background: #2a3a5e;
+  border: 1px solid #3a4a7e;
+  color: #e0e0e0;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+
+.btn:hover { background: #3a4a7e; }
+.btn.active { background: #ff6b6b; border-color: #ff6b6b; color: #fff; }
+.btn.go { background: #00c853; border-color: #00c853; color: #fff; }
+.btn.go:hover { background: #00e676; }
+
+.separator {
+  width: 1px;
+  height: 24px;
+  background: #3a4a7e;
+}
+
+select {
+  background: #2a3a5e;
+  border: 1px solid #3a4a7e;
+  color: #e0e0e0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.info {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #7a8ab0;
+}
+
+canvas {
+  flex: 1;
+  display: block;
+  cursor: crosshair;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 20px;
+  background: #16213e;
+  border-top: 1px solid #2a3a5e;
+  font-size: 0.75rem;
+  color: #7a8ab0;
+}
+
+.status-bar .stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-bar .stat span {
+  color: #feca57;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>🁣 Domino Chain</h1>
+  <button class="btn active" id="btn-place" title="Place dominoes">Place</button>
+  <button class="btn" id="btn-erase" title="Remove dominoes">Erase</button>
+  <div class="separator"></div>
+  <button class="btn go" id="btn-topple">Topple!</button>
+  <button class="btn" id="btn-reset">Reset</button>
+  <div class="separator"></div>
+  <select id="preset-select">
+    <option value="">Presets...</option>
+    <option value="line">Straight Line</option>
+    <option value="spiral">Spiral</option>
+    <option value="zigzag">Zigzag</option>
+    <option value="cascade">Cascade</option>
+    <option value="circle">Circle</option>
+    <option value="domino-day">Domino Day</option>
+  </select>
+  <select id="color-select">
+    <option value="classic">Classic (White)</option>
+    <option value="rainbow">Rainbow</option>
+    <option value="neon">Neon Glow</option>
+    <option value="wooden">Wooden</option>
+    <option value="pastel">Pastel</option>
+  </select>
+  <div class="info">Click to place · Drag for line · Space to topple</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="status-bar">
+  <div class="stat">Dominoes: <span id="count">0</span></div>
+  <div class="stat">Toppled: <span id="toppled">0</span></div>
+  <div class="stat">Speed: <span id="speed">1x</span></div>
+  <div class="stat" style="margin-left:auto">[ / ] speed · R reset · Space topple</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = canvas.clientWidth * devicePixelRatio;
+  H = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+resize();
+window.addEventListener('resize', () => {
+  ctx.setTransform(1,0,0,1,0,0);
+  resize();
+});
+
+const DOMINO_WIDTH = 8;
+const DOMINO_HEIGHT = 40;
+const GRAVITY = 980;
+const DOMINO_SPACING = 16;
+
+let dominoes = [];
+let mode = 'place';
+let simulating = false;
+let simSpeed = 1;
+let colorScheme = 'classic';
+let toppleCount = 0;
+let particles = [];
+
+class Domino {
+  constructor(x, y, angle = 0) {
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.angularVel = 0;
+    this.fallen = false;
+    this.falling = false;
+    this.fallDirection = 0;
+    this.colorIndex = dominoes.length;
+    this.hitGround = false;
+  }
+
+  get tipX() {
+    return this.x + Math.sin(this.angle) * DOMINO_HEIGHT;
+  }
+
+  get tipY() {
+    return this.y - Math.cos(this.angle) * DOMINO_HEIGHT;
+  }
+
+  get baseX() {
+    return this.x - Math.sin(this.angle) * (DOMINO_HEIGHT * 0.05);
+  }
+
+  get baseY() {
+    return this.y + Math.cos(this.angle) * (DOMINO_HEIGHT * 0.05);
+  }
+}
+
+function getColor(index, total) {
+  switch (colorScheme) {
+    case 'rainbow': {
+      const hue = (index / Math.max(total, 1)) * 360;
+      return `hsl(${hue}, 80%, 65%)`;
+    }
+    case 'neon': {
+      const hues = [0, 120, 180, 280, 60];
+      const h = hues[index % hues.length];
+      return `hsl(${h}, 100%, 60%)`;
+    }
+    case 'wooden': {
+      const l = 35 + (index % 4) * 8;
+      return `hsl(30, 60%, ${l}%)`;
+    }
+    case 'pastel': {
+      const hue = (index * 47) % 360;
+      return `hsl(${hue}, 60%, 78%)`;
+    }
+    default:
+      return '#f0f0f0';
+  }
+}
+
+function getGlow(index) {
+  if (colorScheme === 'neon') {
+    const hues = [0, 120, 180, 280, 60];
+    const h = hues[index % hues.length];
+    return `hsl(${h}, 100%, 50%)`;
+  }
+  return null;
+}
+
+function drawDomino(d) {
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.rotate(d.angle);
+
+  const color = getColor(d.colorIndex, dominoes.length);
+  const glow = getGlow(d.colorIndex);
+
+  if (glow && !d.hitGround) {
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 12;
+  }
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(-DOMINO_WIDTH / 2, -DOMINO_HEIGHT, DOMINO_WIDTH, DOMINO_HEIGHT, 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // Dot pattern
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.arc(0, -DOMINO_HEIGHT * 0.3, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0, -DOMINO_HEIGHT * 0.7, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Center line
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.moveTo(-DOMINO_WIDTH / 2 + 1, -DOMINO_HEIGHT * 0.5);
+  ctx.lineTo(DOMINO_WIDTH / 2 - 1, -DOMINO_HEIGHT * 0.5);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function spawnParticles(x, y, color) {
+  for (let i = 0; i < 5; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 100,
+      vy: -Math.random() * 150 - 50,
+      life: 1,
+      color,
+      size: Math.random() * 3 + 1
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 400 * dt;
+    p.life -= dt * 2;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function simulate(dt) {
+  if (!simulating) return;
+
+  dt *= simSpeed;
+  const maxAngle = Math.PI / 2 * 0.95;
+
+  for (const d of dominoes) {
+    if (!d.falling || d.hitGround) continue;
+
+    const torque = GRAVITY * 0.5 * Math.cos(d.angle) * d.fallDirection;
+    d.angularVel += torque * dt * 0.003;
+    d.angularVel *= 0.995;
+    d.angle += d.angularVel * dt;
+
+    if (Math.abs(d.angle) >= maxAngle) {
+      d.angle = maxAngle * d.fallDirection;
+      d.angularVel = 0;
+      d.hitGround = true;
+      if (!d.fallen) {
+        d.fallen = true;
+        toppleCount++;
+        document.getElementById('toppled').textContent = toppleCount;
+        const color = getColor(d.colorIndex, dominoes.length);
+        spawnParticles(d.tipX, d.tipY, color);
+      }
+    }
+
+    // Check collisions with neighbors
+    for (const other of dominoes) {
+      if (other === d || other.hitGround) continue;
+      if (other.falling && Math.sign(other.fallDirection) === Math.sign(d.fallDirection)) continue;
+
+      const dx = other.x - d.x;
+      const dy = other.y - d.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > DOMINO_HEIGHT * 1.2) continue;
+
+      const tipDx = d.tipX - other.x;
+      const tipDy = d.tipY - other.y;
+      const tipDist = Math.sqrt(tipDx * tipDx + tipDy * tipDy);
+
+      if (tipDist < DOMINO_HEIGHT * 0.85 && !other.falling) {
+        other.falling = true;
+        other.fallDirection = dx > 0 ? 1 : -1;
+        other.angularVel = d.angularVel * 0.7;
+      }
+    }
+  }
+
+  updateParticles(dt);
+}
+
+function draw() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Ground
+  const groundY = h - 60;
+  ctx.fillStyle = '#0f1528';
+  ctx.fillRect(0, groundY, w, 60);
+  ctx.strokeStyle = '#2a3a5e';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY);
+  ctx.lineTo(w, groundY);
+  ctx.stroke();
+
+  // Ground reflection
+  const grad = ctx.createLinearGradient(0, groundY, 0, groundY + 30);
+  grad.addColorStop(0, 'rgba(255,255,255,0.02)');
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, groundY, w, 30);
+
+  // Draw shadows
+  ctx.globalAlpha = 0.15;
+  for (const d of dominoes) {
+    ctx.save();
+    ctx.translate(d.x + 3, d.y + 2);
+    ctx.rotate(d.angle);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(-DOMINO_WIDTH / 2, -DOMINO_HEIGHT, DOMINO_WIDTH, DOMINO_HEIGHT);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  for (const d of dominoes) {
+    drawDomino(d);
+  }
+
+  drawParticles();
+
+  // Ghost domino while placing
+  if (mode === 'place' && !simulating && ghostPos) {
+    ctx.globalAlpha = 0.4;
+    ctx.save();
+    ctx.translate(ghostPos.x, ghostPos.y);
+    ctx.fillStyle = '#7a8ab0';
+    ctx.beginPath();
+    ctx.roundRect(-DOMINO_WIDTH / 2, -DOMINO_HEIGHT, DOMINO_WIDTH, DOMINO_HEIGHT, 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+}
+
+let lastTime = 0;
+function loop(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+  simulate(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// Interaction
+let ghostPos = null;
+let isDragging = false;
+let dragStart = null;
+let dragDominoes = [];
+
+const groundY = () => canvas.clientHeight - 60;
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  ghostPos = { x: e.clientX - rect.left, y: groundY() };
+
+  if (isDragging && mode === 'place') {
+    const dx = ghostPos.x - dragStart.x;
+    const count = Math.floor(Math.abs(dx) / DOMINO_SPACING);
+    dragDominoes = [];
+    for (let i = 0; i <= count; i++) {
+      const x = dragStart.x + (dx > 0 ? 1 : -1) * i * DOMINO_SPACING;
+      dragDominoes.push({ x, y: groundY() });
+    }
+  }
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (mode === 'erase') {
+    for (let i = dominoes.length - 1; i >= 0; i--) {
+      const d = dominoes[i];
+      const dx = d.x - mx;
+      const dy = d.y - DOMINO_HEIGHT / 2 - my;
+      if (Math.sqrt(dx * dx + dy * dy) < DOMINO_HEIGHT * 0.6) {
+        dominoes.splice(i, 1);
+        updateCount();
+        break;
+      }
+    }
+    return;
+  }
+
+  isDragging = true;
+  dragStart = { x: mx, y: groundY() };
+  dragDominoes = [{ x: mx, y: groundY() }];
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (isDragging && mode === 'place' && !simulating) {
+    for (const pos of dragDominoes) {
+      const tooClose = dominoes.some(d => Math.abs(d.x - pos.x) < DOMINO_WIDTH * 1.5);
+      if (!tooClose) {
+        dominoes.push(new Domino(pos.x, pos.y));
+      }
+    }
+    updateCount();
+  }
+  isDragging = false;
+  dragDominoes = [];
+});
+
+canvas.addEventListener('mouseleave', () => {
+  ghostPos = null;
+  isDragging = false;
+  dragDominoes = [];
+});
+
+function updateCount() {
+  document.getElementById('count').textContent = dominoes.length;
+}
+
+// Buttons
+document.getElementById('btn-place').addEventListener('click', () => {
+  mode = 'place';
+  document.getElementById('btn-place').classList.add('active');
+  document.getElementById('btn-erase').classList.remove('active');
+  canvas.style.cursor = 'crosshair';
+});
+
+document.getElementById('btn-erase').addEventListener('click', () => {
+  mode = 'erase';
+  document.getElementById('btn-erase').classList.add('active');
+  document.getElementById('btn-place').classList.remove('active');
+  canvas.style.cursor = 'pointer';
+});
+
+document.getElementById('btn-topple').addEventListener('click', topple);
+document.getElementById('btn-reset').addEventListener('click', resetSim);
+
+function topple() {
+  if (dominoes.length === 0) return;
+  simulating = true;
+  toppleCount = 0;
+  document.getElementById('toppled').textContent = '0';
+  const first = dominoes[0];
+  first.falling = true;
+  first.fallDirection = 1;
+  first.angularVel = 2;
+}
+
+function resetSim() {
+  simulating = false;
+  toppleCount = 0;
+  particles = [];
+  document.getElementById('toppled').textContent = '0';
+  for (const d of dominoes) {
+    d.angle = 0;
+    d.angularVel = 0;
+    d.fallen = false;
+    d.falling = false;
+    d.fallDirection = 0;
+    d.hitGround = false;
+  }
+}
+
+// Presets
+document.getElementById('preset-select').addEventListener('change', (e) => {
+  const preset = e.target.value;
+  if (!preset) return;
+  loadPreset(preset);
+  e.target.value = '';
+});
+
+function loadPreset(name) {
+  dominoes = [];
+  simulating = false;
+  toppleCount = 0;
+  particles = [];
+  document.getElementById('toppled').textContent = '0';
+  const w = canvas.clientWidth;
+  const gy = groundY();
+
+  switch (name) {
+    case 'line': {
+      const count = Math.floor((w - 100) / DOMINO_SPACING);
+      for (let i = 0; i < count; i++) {
+        dominoes.push(new Domino(50 + i * DOMINO_SPACING, gy));
+      }
+      break;
+    }
+    case 'spiral': {
+      const cx = w / 2;
+      const cy = gy - 100;
+      for (let i = 0; i < 80; i++) {
+        const angle = i * 0.15;
+        const radius = 30 + i * 2.5;
+        const x = cx + Math.cos(angle) * radius;
+        const y = cy + Math.sin(angle) * radius * 0.4;
+        if (y < gy && x > 30 && x < w - 30) {
+          dominoes.push(new Domino(x, gy));
+        }
+      }
+      break;
+    }
+    case 'zigzag': {
+      let x = 60;
+      let dir = 1;
+      const segLen = 8;
+      while (x < w - 60) {
+        for (let i = 0; i < segLen && x < w - 60; i++) {
+          dominoes.push(new Domino(x, gy));
+          x += DOMINO_SPACING;
+        }
+        dir *= -1;
+      }
+      break;
+    }
+    case 'cascade': {
+      const rows = 5;
+      const spacing = DOMINO_SPACING * 1.2;
+      for (let row = 0; row < rows; row++) {
+        const count = 12 - row * 2;
+        const startX = w / 2 - (count * spacing) / 2;
+        for (let i = 0; i < count; i++) {
+          dominoes.push(new Domino(startX + i * spacing, gy));
+        }
+      }
+      break;
+    }
+    case 'circle': {
+      const cx = w / 2;
+      const radius = Math.min(w, canvas.clientHeight - 160) * 0.35;
+      const count = Math.floor((2 * Math.PI * radius) / DOMINO_SPACING);
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const x = cx + Math.cos(angle) * radius;
+        const y = gy - 20 + Math.sin(angle) * radius * 0.15;
+        if (x > 30 && x < w - 30) {
+          dominoes.push(new Domino(x, gy));
+        }
+      }
+      break;
+    }
+    case 'domino-day': {
+      // Complex pattern: converging lines
+      const mid = w / 2;
+      // Left line
+      for (let i = 0; i < 20; i++) {
+        dominoes.push(new Domino(40 + i * DOMINO_SPACING, gy));
+      }
+      // Right line
+      for (let i = 0; i < 20; i++) {
+        dominoes.push(new Domino(w - 40 - i * DOMINO_SPACING, gy));
+      }
+      // Center bridge
+      for (let i = 0; i < 15; i++) {
+        dominoes.push(new Domino(mid - 7 * DOMINO_SPACING + i * DOMINO_SPACING, gy));
+      }
+      break;
+    }
+  }
+
+  updateCount();
+}
+
+// Color scheme
+document.getElementById('color-select').addEventListener('change', (e) => {
+  colorScheme = e.target.value;
+});
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (simulating) resetSim(); else topple();
+  }
+  if (e.key === 'r' || e.key === 'R') resetSim();
+  if (e.key === '[') {
+    simSpeed = Math.max(0.25, simSpeed - 0.25);
+    document.getElementById('speed').textContent = simSpeed + 'x';
+  }
+  if (e.key === ']') {
+    simSpeed = Math.min(3, simSpeed + 0.25);
+    document.getElementById('speed').textContent = simSpeed + 'x';
+  }
+  if (e.key === 'c' || e.key === 'C') {
+    dominoes = [];
+    particles = [];
+    simulating = false;
+    toppleCount = 0;
+    updateCount();
+    document.getElementById('toppled').textContent = '0';
+  }
+});
+
+// Load a default preset after layout is ready
+requestAnimationFrame(() => loadPreset('line'));
+</script>
+</body>
+</html>

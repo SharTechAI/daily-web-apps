@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>String Art Generator</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a25;
+    --border: #2a2a3a;
+    --accent: #ff6b9d;
+    --accent2: #c084fc;
+    --accent3: #67e8f9;
+    --text: #e8e8f0;
+    --muted: #7a7a8c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sidebar-header .icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+  }
+
+  .sidebar-header h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .sidebar-header .sub {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .control-row:last-child { margin-bottom: 0; }
+
+  .control-label {
+    font-size: 0.82rem;
+    color: var(--text);
+  }
+
+  .control-value {
+    font-size: 0.75rem;
+    color: var(--accent2);
+    font-weight: 600;
+    min-width: 32px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    margin-top: 4px;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent2);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    width: 100%;
+  }
+
+  select:focus { border-color: var(--accent2); }
+
+  .color-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.active { border-color: #fff; }
+
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .preset-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .preset-btn:hover {
+    border-color: var(--accent2);
+    background: rgba(192, 132, 252, 0.1);
+  }
+
+  .preset-btn.active {
+    border-color: var(--accent);
+    background: rgba(255, 107, 157, 0.12);
+  }
+
+  .layer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .layer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .layer-item:hover { border-color: var(--accent2); }
+  .layer-item.active { border-color: var(--accent); }
+
+  .layer-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+  }
+
+  .layer-info { flex: 1; }
+
+  .layer-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0 4px;
+    transition: color 0.2s;
+  }
+
+  .layer-remove:hover { color: #ff4444; }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    border: none;
+  }
+
+  .btn-primary:hover { opacity: 0.9; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent2); }
+
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: var(--bg);
+  }
+
+  canvas {
+    border-radius: 8px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .toggle {
+    width: 36px;
+    height: 20px;
+    background: var(--border);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.active { background: var(--accent2); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: left 0.2s;
+  }
+
+  .toggle.active::after { left: 18px; }
+
+  .info-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    display: flex;
+    gap: 20px;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .info-bar span { color: var(--accent3); font-weight: 600; }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+
+  .checkbox-row input[type="checkbox"] {
+    accent-color: var(--accent2);
+  }
+
+  @media (max-width: 768px) {
+    body { flex-direction: column; }
+    .sidebar {
+      width: 100%;
+      min-width: 100%;
+      max-height: 45vh;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .canvas-area { min-height: 55vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="icon">🧵</div>
+    <div>
+      <h1>String Art Generator</h1>
+      <div class="sub">Mathematical thread art patterns</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Presets</div>
+    <div class="preset-grid">
+      <button class="preset-btn active" data-preset="classic">Classic Star</button>
+      <button class="preset-btn" data-preset="cardioid">Cardioid</button>
+      <button class="preset-btn" data-preset="astroid">Astroid</button>
+      <button class="preset-btn" data-preset="deltoid">Deltoid</button>
+      <button class="preset-btn" data-preset="web">Spider Web</button>
+      <button class="preset-btn" data-preset="flower">Flower</button>
+      <button class="preset-btn" data-preset="spiral">Spiral</button>
+      <button class="preset-btn" data-preset="chaos">Chaos Weave</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Shape</div>
+    <div class="control-row">
+      <span class="control-label">Frame</span>
+    </div>
+    <select id="frame-shape">
+      <option value="circle">Circle</option>
+      <option value="square">Square</option>
+      <option value="triangle">Triangle</option>
+      <option value="hexagon">Hexagon</option>
+      <option value="star">Star</option>
+      <option value="heart">Heart</option>
+    </select>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Parameters</div>
+    <div class="control-row">
+      <span class="control-label">Pins</span>
+      <span class="control-value" id="pins-val">120</span>
+    </div>
+    <input type="range" id="pins" min="12" max="360" value="120">
+
+    <div class="control-row" style="margin-top: 12px">
+      <span class="control-label">Skip (Multiplier)</span>
+      <span class="control-value" id="skip-val">37</span>
+    </div>
+    <input type="range" id="skip" min="1" max="179" value="37">
+
+    <div class="control-row" style="margin-top: 12px">
+      <span class="control-label">Offset</span>
+      <span class="control-value" id="offset-val">0</span>
+    </div>
+    <input type="range" id="offset" min="0" max="100" value="0">
+
+    <div class="control-row" style="margin-top: 12px">
+      <span class="control-label">Line Width</span>
+      <span class="control-value" id="linewidth-val">0.5</span>
+    </div>
+    <input type="range" id="linewidth" min="1" max="30" value="5">
+  </div>
+
+  <div class="section">
+    <div class="section-title">Appearance</div>
+    <div class="control-row">
+      <span class="control-label">Color Mode</span>
+    </div>
+    <select id="color-mode">
+      <option value="single">Single Color</option>
+      <option value="gradient">Gradient</option>
+      <option value="rainbow">Rainbow</option>
+      <option value="angle">Angle Based</option>
+      <option value="length">Length Based</option>
+    </select>
+
+    <div class="color-row" id="color-swatches">
+      <div class="color-swatch active" data-color="#ff6b9d" style="background:#ff6b9d"></div>
+      <div class="color-swatch" data-color="#c084fc" style="background:#c084fc"></div>
+      <div class="color-swatch" data-color="#67e8f9" style="background:#67e8f9"></div>
+      <div class="color-swatch" data-color="#fbbf24" style="background:#fbbf24"></div>
+      <div class="color-swatch" data-color="#34d399" style="background:#34d399"></div>
+      <div class="color-swatch" data-color="#fb923c" style="background:#fb923c"></div>
+      <div class="color-swatch" data-color="#f472b6" style="background:#f472b6"></div>
+      <div class="color-swatch" data-color="#ffffff" style="background:#ffffff"></div>
+    </div>
+
+    <div class="control-row" style="margin-top: 14px">
+      <span class="control-label">Opacity</span>
+      <span class="control-value" id="opacity-val">40%</span>
+    </div>
+    <input type="range" id="opacity" min="5" max="100" value="40">
+  </div>
+
+  <div class="section">
+    <div class="section-title">Options</div>
+    <div class="toggle-row">
+      <span class="control-label">Show Pins</span>
+      <div class="toggle active" id="toggle-pins"></div>
+    </div>
+    <div class="toggle-row">
+      <span class="control-label">Show Frame</span>
+      <div class="toggle active" id="toggle-frame"></div>
+    </div>
+    <div class="toggle-row">
+      <span class="control-label">Glow Effect</span>
+      <div class="toggle" id="toggle-glow"></div>
+    </div>
+    <div class="toggle-row">
+      <span class="control-label">Animate Drawing</span>
+      <div class="toggle" id="toggle-animate"></div>
+    </div>
+    <div class="toggle-row">
+      <span class="control-label">Dark Pins</span>
+      <div class="toggle" id="toggle-dark-pins"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Layers</div>
+    <div class="layer-list" id="layer-list"></div>
+    <div class="btn-row" style="margin-top: 10px">
+      <button class="btn btn-secondary" id="add-layer">+ Add Layer</button>
+      <button class="btn btn-secondary" id="clear-layers">Clear All</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="btn-row">
+      <button class="btn btn-primary" id="export-png">Export PNG</button>
+      <button class="btn btn-secondary" id="export-svg">Export SVG</button>
+    </div>
+  </div>
+</div>
+
+<div class="canvas-area">
+  <canvas id="canvas"></canvas>
+  <div class="info-bar">
+    <div>Pins: <span id="info-pins">120</span></div>
+    <div>Threads: <span id="info-threads">120</span></div>
+    <div>Skip: <span id="info-skip">37</span></div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, cx, cy, radius;
+
+const state = {
+  pins: 120,
+  skip: 37,
+  offset: 0,
+  lineWidth: 0.5,
+  frameShape: 'circle',
+  colorMode: 'single',
+  threadColor: '#ff6b9d',
+  opacity: 0.4,
+  showPins: true,
+  showFrame: true,
+  glow: false,
+  animate: false,
+  darkPins: false,
+  layers: [],
+  activeLayer: -1,
+  animProgress: 0,
+  animId: null
+};
+
+function resize() {
+  const area = canvas.parentElement;
+  const s = Math.min(area.clientWidth - 60, area.clientHeight - 80);
+  W = H = Math.max(400, s);
+  canvas.width = W * 2;
+  canvas.height = H * 2;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(2, 2);
+  cx = W / 2;
+  cy = H / 2;
+  radius = (Math.min(W, H) / 2) - 30;
+  draw();
+}
+
+function getPinPositions(numPins, shape) {
+  const pins = [];
+  switch (shape) {
+    case 'circle':
+      for (let i = 0; i < numPins; i++) {
+        const a = (i / numPins) * Math.PI * 2 - Math.PI / 2;
+        pins.push({ x: cx + Math.cos(a) * radius, y: cy + Math.sin(a) * radius });
+      }
+      break;
+    case 'square': {
+      const side = radius * 1.6;
+      const perSide = Math.floor(numPins / 4);
+      const extra = numPins - perSide * 4;
+      const corners = [
+        { x: cx - side / 2, y: cy - side / 2 },
+        { x: cx + side / 2, y: cy - side / 2 },
+        { x: cx + side / 2, y: cy + side / 2 },
+        { x: cx - side / 2, y: cy + side / 2 }
+      ];
+      for (let s = 0; s < 4; s++) {
+        const count = perSide + (s < extra ? 1 : 0);
+        const c1 = corners[s], c2 = corners[(s + 1) % 4];
+        for (let i = 0; i < count; i++) {
+          const t = i / count;
+          pins.push({ x: c1.x + (c2.x - c1.x) * t, y: c1.y + (c2.y - c1.y) * t });
+        }
+      }
+      break;
+    }
+    case 'triangle': {
+      const r = radius * 1.1;
+      const corners = [];
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+        corners.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+      }
+      const perSide = Math.floor(numPins / 3);
+      const extra = numPins - perSide * 3;
+      for (let s = 0; s < 3; s++) {
+        const count = perSide + (s < extra ? 1 : 0);
+        const c1 = corners[s], c2 = corners[(s + 1) % 3];
+        for (let i = 0; i < count; i++) {
+          const t = i / count;
+          pins.push({ x: c1.x + (c2.x - c1.x) * t, y: c1.y + (c2.y - c1.y) * t });
+        }
+      }
+      break;
+    }
+    case 'hexagon': {
+      const r = radius;
+      const corners = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        corners.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+      }
+      const perSide = Math.floor(numPins / 6);
+      const extra = numPins - perSide * 6;
+      for (let s = 0; s < 6; s++) {
+        const count = perSide + (s < extra ? 1 : 0);
+        const c1 = corners[s], c2 = corners[(s + 1) % 6];
+        for (let i = 0; i < count; i++) {
+          const t = i / count;
+          pins.push({ x: c1.x + (c2.x - c1.x) * t, y: c1.y + (c2.y - c1.y) * t });
+        }
+      }
+      break;
+    }
+    case 'star': {
+      const outerR = radius;
+      const innerR = radius * 0.45;
+      const points = 5;
+      const corners = [];
+      for (let i = 0; i < points * 2; i++) {
+        const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        corners.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+      }
+      const sides = corners.length;
+      const perSide = Math.floor(numPins / sides);
+      const extra = numPins - perSide * sides;
+      for (let s = 0; s < sides; s++) {
+        const count = perSide + (s < extra ? 1 : 0);
+        const c1 = corners[s], c2 = corners[(s + 1) % sides];
+        for (let i = 0; i < count; i++) {
+          const t = i / count;
+          pins.push({ x: c1.x + (c2.x - c1.x) * t, y: c1.y + (c2.y - c1.y) * t });
+        }
+      }
+      break;
+    }
+    case 'heart': {
+      for (let i = 0; i < numPins; i++) {
+        const t = (i / numPins) * Math.PI * 2;
+        const scale = radius * 0.055;
+        const hx = 16 * Math.pow(Math.sin(t), 3);
+        const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+        pins.push({ x: cx + hx * scale, y: cy + hy * scale - 10 });
+      }
+      break;
+    }
+  }
+  return pins;
+}
+
+function getThreadColor(i, total, lineFrom, lineTo) {
+  const { colorMode, threadColor, opacity } = state;
+  const a = opacity;
+
+  switch (colorMode) {
+    case 'single':
+      return hexToRgba(threadColor, a);
+    case 'gradient': {
+      const t = i / total;
+      const c1 = hexToRgb(threadColor);
+      const c2 = hexToRgb(shiftHue(threadColor, 120));
+      return `rgba(${Math.round(c1.r + (c2.r - c1.r) * t)},${Math.round(c1.g + (c2.g - c1.g) * t)},${Math.round(c1.b + (c2.b - c1.b) * t)},${a})`;
+    }
+    case 'rainbow': {
+      const hue = (i / total) * 360;
+      return `hsla(${hue},80%,60%,${a})`;
+    }
+    case 'angle': {
+      const dx = lineTo.x - lineFrom.x;
+      const dy = lineTo.y - lineFrom.y;
+      const angle = Math.atan2(dy, dx);
+      const hue = ((angle + Math.PI) / (Math.PI * 2)) * 360;
+      return `hsla(${hue},75%,55%,${a})`;
+    }
+    case 'length': {
+      const dx = lineTo.x - lineFrom.x;
+      const dy = lineTo.y - lineFrom.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const maxLen = radius * 2;
+      const hue = (len / maxLen) * 270;
+      return `hsla(${hue},80%,55%,${a})`;
+    }
+    default:
+      return hexToRgba(threadColor, a);
+  }
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+function hexToRgba(hex, a) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function shiftHue(hex, degrees) {
+  const { r, g, b } = hexToRgb(hex);
+  let [h, s, l] = rgbToHsl(r, g, b);
+  h = (h + degrees) % 360;
+  const [nr, ng, nb] = hslToRgb(h, s, l);
+  return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) * 60; break;
+      case g: h = ((b - r) / d + 2) * 60; break;
+      case b: h = ((r - g) / d + 4) * 60; break;
+    }
+  }
+  return [h, s, l];
+}
+
+function hslToRgb(h, s, l) {
+  h /= 360;
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function getConnections(numPins, skip, offset) {
+  const connections = [];
+  const off = Math.floor(offset / 100 * numPins);
+  for (let i = 0; i < numPins; i++) {
+    const from = (i + off) % numPins;
+    const to = (from + skip) % numPins;
+    connections.push([from, to]);
+  }
+  return connections;
+}
+
+function drawLayer(layerState, pins) {
+  const connections = getConnections(pins.length, layerState.skip, layerState.offset);
+  const maxDraw = layerState.animate
+    ? Math.floor(connections.length * layerState.animProgress)
+    : connections.length;
+
+  if (layerState.glow) {
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = layerState.threadColor;
+  }
+
+  ctx.lineWidth = layerState.lineWidth;
+
+  for (let i = 0; i < maxDraw; i++) {
+    const [from, to] = connections[i];
+    const p1 = pins[from];
+    const p2 = pins[to];
+    ctx.strokeStyle = getThreadColorForLayer(i, connections.length, p1, p2, layerState);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+}
+
+function getThreadColorForLayer(i, total, lineFrom, lineTo, ls) {
+  const savedState = {
+    colorMode: state.colorMode,
+    threadColor: state.threadColor,
+    opacity: state.opacity
+  };
+  state.colorMode = ls.colorMode;
+  state.threadColor = ls.threadColor;
+  state.opacity = ls.opacity;
+  const color = getThreadColor(i, total, lineFrom, lineTo);
+  Object.assign(state, savedState);
+  return color;
+}
+
+function drawFrame(pins) {
+  if (!state.showFrame) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (state.frameShape === 'circle') {
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  } else {
+    ctx.moveTo(pins[0].x, pins[0].y);
+    for (let i = 1; i < pins.length; i++) {
+      ctx.lineTo(pins[i].x, pins[i].y);
+    }
+    ctx.closePath();
+  }
+  ctx.stroke();
+}
+
+function drawPins(pins) {
+  if (!state.showPins) return;
+  const pinColor = state.darkPins ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
+  const pinRadius = Math.max(1.5, 3 - pins.length / 120);
+  ctx.fillStyle = pinColor;
+  for (const p of pins) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, pinRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  const pins = getPinPositions(state.pins, state.frameShape);
+
+  drawFrame(pins);
+
+  if (state.layers.length === 0) {
+    const connections = getConnections(state.pins, state.skip, state.offset);
+    const maxDraw = state.animate
+      ? Math.floor(connections.length * state.animProgress)
+      : connections.length;
+
+    if (state.glow) {
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = state.threadColor;
+    }
+
+    ctx.lineWidth = state.lineWidth;
+
+    for (let i = 0; i < maxDraw; i++) {
+      const [from, to] = connections[i];
+      const p1 = pins[from];
+      const p2 = pins[to];
+      ctx.strokeStyle = getThreadColor(i, connections.length, p1, p2);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+
+    document.getElementById('info-threads').textContent = maxDraw;
+  } else {
+    let totalThreads = 0;
+    for (const layer of state.layers) {
+      const layerPins = getPinPositions(state.pins, state.frameShape);
+      drawLayer(layer, layerPins);
+      totalThreads += state.pins;
+    }
+    document.getElementById('info-threads').textContent = totalThreads;
+  }
+
+  drawPins(pins);
+
+  document.getElementById('info-pins').textContent = state.pins;
+  document.getElementById('info-skip').textContent = state.skip;
+}
+
+function animateDrawing() {
+  if (!state.animate) return;
+  state.animProgress += 0.008;
+  if (state.animProgress >= 1) {
+    state.animProgress = 1;
+    state.animate = false;
+    document.getElementById('toggle-animate').classList.remove('active');
+  }
+  draw();
+  if (state.animate) {
+    state.animId = requestAnimationFrame(animateDrawing);
+  }
+}
+
+function startAnimation() {
+  state.animProgress = 0;
+  state.animate = true;
+  if (state.animId) cancelAnimationFrame(state.animId);
+  animateDrawing();
+}
+
+const presets = {
+  classic: { pins: 120, skip: 37, offset: 0, frameShape: 'circle', colorMode: 'single', threadColor: '#ff6b9d', lineWidth: 0.5, opacity: 0.4 },
+  cardioid: { pins: 200, skip: 2, offset: 0, frameShape: 'circle', colorMode: 'rainbow', threadColor: '#c084fc', lineWidth: 0.4, opacity: 0.5 },
+  astroid: { pins: 200, skip: 50, offset: 0, frameShape: 'circle', colorMode: 'gradient', threadColor: '#67e8f9', lineWidth: 0.3, opacity: 0.45 },
+  deltoid: { pins: 180, skip: 60, offset: 0, frameShape: 'circle', colorMode: 'angle', threadColor: '#34d399', lineWidth: 0.4, opacity: 0.4 },
+  web: { pins: 72, skip: 7, offset: 0, frameShape: 'hexagon', colorMode: 'length', threadColor: '#ffffff', lineWidth: 0.4, opacity: 0.3 },
+  flower: { pins: 240, skip: 89, offset: 0, frameShape: 'circle', colorMode: 'rainbow', threadColor: '#f472b6', lineWidth: 0.3, opacity: 0.35 },
+  spiral: { pins: 300, skip: 113, offset: 0, frameShape: 'circle', colorMode: 'gradient', threadColor: '#fbbf24', lineWidth: 0.3, opacity: 0.35 },
+  chaos: { pins: 360, skip: 137, offset: 0, frameShape: 'circle', colorMode: 'rainbow', threadColor: '#fb923c', lineWidth: 0.2, opacity: 0.25 }
+};
+
+function applyPreset(name) {
+  const p = presets[name];
+  if (!p) return;
+  state.pins = p.pins;
+  state.skip = p.skip;
+  state.offset = p.offset;
+  state.frameShape = p.frameShape;
+  state.colorMode = p.colorMode;
+  state.threadColor = p.threadColor;
+  state.lineWidth = p.lineWidth;
+  state.opacity = p.opacity;
+  state.layers = [];
+
+  document.getElementById('pins').value = p.pins;
+  document.getElementById('pins-val').textContent = p.pins;
+  document.getElementById('skip').value = p.skip;
+  document.getElementById('skip-val').textContent = p.skip;
+  document.getElementById('offset').value = p.offset;
+  document.getElementById('offset-val').textContent = p.offset;
+  document.getElementById('linewidth').value = p.lineWidth * 10;
+  document.getElementById('linewidth-val').textContent = p.lineWidth;
+  document.getElementById('frame-shape').value = p.frameShape;
+  document.getElementById('color-mode').value = p.colorMode;
+  document.getElementById('opacity').value = p.opacity * 100;
+  document.getElementById('opacity-val').textContent = Math.round(p.opacity * 100) + '%';
+
+  document.querySelectorAll('.color-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.color === p.threadColor);
+  });
+
+  renderLayers();
+  draw();
+}
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyPreset(btn.dataset.preset);
+  });
+});
+
+document.getElementById('pins').addEventListener('input', e => {
+  state.pins = parseInt(e.target.value);
+  document.getElementById('pins-val').textContent = state.pins;
+  draw();
+});
+
+document.getElementById('skip').addEventListener('input', e => {
+  state.skip = parseInt(e.target.value);
+  document.getElementById('skip-val').textContent = state.skip;
+  draw();
+});
+
+document.getElementById('offset').addEventListener('input', e => {
+  state.offset = parseInt(e.target.value);
+  document.getElementById('offset-val').textContent = state.offset;
+  draw();
+});
+
+document.getElementById('linewidth').addEventListener('input', e => {
+  state.lineWidth = parseInt(e.target.value) / 10;
+  document.getElementById('linewidth-val').textContent = state.lineWidth;
+  draw();
+});
+
+document.getElementById('frame-shape').addEventListener('change', e => {
+  state.frameShape = e.target.value;
+  draw();
+});
+
+document.getElementById('color-mode').addEventListener('change', e => {
+  state.colorMode = e.target.value;
+  draw();
+});
+
+document.getElementById('opacity').addEventListener('input', e => {
+  state.opacity = parseInt(e.target.value) / 100;
+  document.getElementById('opacity-val').textContent = Math.round(state.opacity * 100) + '%';
+  draw();
+});
+
+document.querySelectorAll('.color-swatch').forEach(swatch => {
+  swatch.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    swatch.classList.add('active');
+    state.threadColor = swatch.dataset.color;
+    draw();
+  });
+});
+
+document.getElementById('toggle-pins').addEventListener('click', function () {
+  this.classList.toggle('active');
+  state.showPins = this.classList.contains('active');
+  draw();
+});
+
+document.getElementById('toggle-frame').addEventListener('click', function () {
+  this.classList.toggle('active');
+  state.showFrame = this.classList.contains('active');
+  draw();
+});
+
+document.getElementById('toggle-glow').addEventListener('click', function () {
+  this.classList.toggle('active');
+  state.glow = this.classList.contains('active');
+  draw();
+});
+
+document.getElementById('toggle-animate').addEventListener('click', function () {
+  this.classList.toggle('active');
+  state.animate = this.classList.contains('active');
+  if (state.animate) startAnimation();
+  else draw();
+});
+
+document.getElementById('toggle-dark-pins').addEventListener('click', function () {
+  this.classList.toggle('active');
+  state.darkPins = this.classList.contains('active');
+  draw();
+});
+
+function renderLayers() {
+  const list = document.getElementById('layer-list');
+  list.innerHTML = '';
+  state.layers.forEach((layer, i) => {
+    const el = document.createElement('div');
+    el.className = 'layer-item' + (state.activeLayer === i ? ' active' : '');
+    el.innerHTML = `
+      <div class="layer-color" style="background:${layer.threadColor}"></div>
+      <div class="layer-info">Layer ${i + 1} (skip: ${layer.skip})</div>
+      <button class="layer-remove" data-idx="${i}">&times;</button>
+    `;
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('layer-remove')) {
+        state.layers.splice(parseInt(e.target.dataset.idx), 1);
+        state.activeLayer = Math.min(state.activeLayer, state.layers.length - 1);
+        renderLayers();
+        draw();
+        return;
+      }
+      state.activeLayer = i;
+      state.skip = layer.skip;
+      state.offset = layer.offset;
+      state.threadColor = layer.threadColor;
+      state.colorMode = layer.colorMode;
+      state.opacity = layer.opacity;
+      state.lineWidth = layer.lineWidth;
+      document.getElementById('skip').value = layer.skip;
+      document.getElementById('skip-val').textContent = layer.skip;
+      document.getElementById('offset').value = layer.offset;
+      document.getElementById('offset-val').textContent = layer.offset;
+      document.getElementById('linewidth').value = layer.lineWidth * 10;
+      document.getElementById('linewidth-val').textContent = layer.lineWidth;
+      document.getElementById('color-mode').value = layer.colorMode;
+      document.getElementById('opacity').value = layer.opacity * 100;
+      document.getElementById('opacity-val').textContent = Math.round(layer.opacity * 100) + '%';
+      document.querySelectorAll('.color-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === layer.threadColor);
+      });
+      renderLayers();
+    });
+    list.appendChild(el);
+  });
+}
+
+document.getElementById('add-layer').addEventListener('click', () => {
+  const colors = ['#ff6b9d', '#c084fc', '#67e8f9', '#fbbf24', '#34d399', '#fb923c'];
+  const skip = Math.floor(Math.random() * 150) + 10;
+  state.layers.push({
+    skip,
+    offset: 0,
+    threadColor: colors[state.layers.length % colors.length],
+    colorMode: state.colorMode,
+    opacity: state.opacity,
+    lineWidth: state.lineWidth,
+    glow: state.glow,
+    animate: false,
+    animProgress: 1
+  });
+  state.activeLayer = state.layers.length - 1;
+  renderLayers();
+  draw();
+});
+
+document.getElementById('clear-layers').addEventListener('click', () => {
+  state.layers = [];
+  state.activeLayer = -1;
+  renderLayers();
+  draw();
+});
+
+['skip', 'offset', 'linewidth', 'opacity'].forEach(param => {
+  document.getElementById(param).addEventListener('input', () => {
+    if (state.activeLayer >= 0 && state.layers[state.activeLayer]) {
+      const layer = state.layers[state.activeLayer];
+      layer.skip = state.skip;
+      layer.offset = state.offset;
+      layer.lineWidth = state.lineWidth;
+      layer.opacity = state.opacity;
+      layer.threadColor = state.threadColor;
+      layer.colorMode = state.colorMode;
+      renderLayers();
+    }
+  });
+});
+
+document.getElementById('color-mode').addEventListener('change', () => {
+  if (state.activeLayer >= 0 && state.layers[state.activeLayer]) {
+    state.layers[state.activeLayer].colorMode = state.colorMode;
+    draw();
+  }
+});
+
+document.querySelectorAll('.color-swatch').forEach(swatch => {
+  swatch.addEventListener('click', () => {
+    if (state.activeLayer >= 0 && state.layers[state.activeLayer]) {
+      state.layers[state.activeLayer].threadColor = state.threadColor;
+      renderLayers();
+    }
+  });
+});
+
+document.getElementById('export-png').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'string-art.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+document.getElementById('export-svg').addEventListener('click', () => {
+  const pins = getPinPositions(state.pins, state.frameShape);
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  svg += `<rect width="${W}" height="${H}" fill="#0a0a0f"/>`;
+
+  if (state.layers.length === 0) {
+    const connections = getConnections(state.pins, state.skip, state.offset);
+    for (let i = 0; i < connections.length; i++) {
+      const [from, to] = connections[i];
+      const p1 = pins[from], p2 = pins[to];
+      const color = getThreadColor(i, connections.length, p1, p2);
+      svg += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${color}" stroke-width="${state.lineWidth}"/>`;
+    }
+  } else {
+    for (const layer of state.layers) {
+      const connections = getConnections(state.pins, layer.skip, layer.offset);
+      for (let i = 0; i < connections.length; i++) {
+        const [from, to] = connections[i];
+        const p1 = pins[from], p2 = pins[to];
+        const color = getThreadColorForLayer(i, connections.length, p1, p2, layer);
+        svg += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${color}" stroke-width="${layer.lineWidth}"/>`;
+      }
+    }
+  }
+
+  svg += '</svg>';
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const link = document.createElement('a');
+  link.download = 'string-art.svg';
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+window.addEventListener('resize', () => {
+  canvas.getContext('2d').setTransform(1, 0, 0, 1, 0, 0);
+  resize();
+});
+
+resize();
+</script>
+</body>
+</html>
