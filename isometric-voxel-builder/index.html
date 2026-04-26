@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Isometric Voxel Builder</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --border: #2a2a5a;
+    --accent: #e94560;
+    --text: #eee;
+    --muted: #8888aa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+  .sidebar {
+    width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    z-index: 10;
+  }
+  .sidebar h1 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar h1 span { font-size: 1.5rem; }
+  .section-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .tool-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tool-btn {
+    padding: 8px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .tool-btn:hover { border-color: var(--accent); }
+  .tool-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .color-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .color-swatch:hover { transform: scale(1.1); }
+  .color-swatch.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.4); }
+  .preset-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.82rem;
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { border-color: var(--accent); background: rgba(233,69,96,0.1); }
+  .action-btn {
+    padding: 10px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .action-btn:hover { filter: brightness(1.2); }
+  .action-btn.secondary { background: var(--surface2); border: 1px solid var(--border); }
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas { display: block; }
+  .controls-overlay {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    background: rgba(22,33,62,0.9);
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+  }
+  .ctrl-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: all 0.15s;
+  }
+  .ctrl-btn:hover { border-color: var(--accent); }
+  .info-overlay {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(22,33,62,0.9);
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+    backdrop-filter: blur(8px);
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .slider-row label { font-size: 0.78rem; min-width: 50px; }
+  .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .slider-row .val { font-size: 0.75rem; color: var(--muted); min-width: 24px; text-align: right; }
+
+  @media (max-width: 700px) {
+    .sidebar { width: 200px; padding: 12px; }
+    .info-overlay { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h1><span>🧊</span> Voxel Builder</h1>
+
+  <div>
+    <div class="section-title">Tools</div>
+    <div class="tool-group">
+      <button class="tool-btn active" data-tool="place">🧱 Place</button>
+      <button class="tool-btn" data-tool="remove">🗑️ Remove</button>
+      <button class="tool-btn" data-tool="paint">🎨 Paint</button>
+      <button class="tool-btn" data-tool="eyedrop">💧 Pick</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">Colors</div>
+    <div class="color-grid" id="colorGrid"></div>
+  </div>
+
+  <div>
+    <div class="section-title">Layer Height</div>
+    <div class="slider-row">
+      <label>Level</label>
+      <input type="range" id="layerSlider" min="0" max="15" value="0">
+      <span class="val" id="layerVal">0</span>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">Grid Size</div>
+    <div class="slider-row">
+      <label>Size</label>
+      <input type="range" id="gridSlider" min="8" max="24" value="12">
+      <span class="val" id="gridVal">12</span>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">Presets</div>
+    <button class="preset-btn" data-preset="house">🏠 Cozy House</button>
+    <button class="preset-btn" data-preset="castle">🏰 Mini Castle</button>
+    <button class="preset-btn" data-preset="tree">🌲 Pine Tree</button>
+    <button class="preset-btn" data-preset="pyramid">🔺 Pyramid</button>
+    <button class="preset-btn" data-preset="tower">🗼 Spiral Tower</button>
+    <button class="preset-btn" data-preset="arch">🌉 Arch Bridge</button>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-direction:column">
+    <button class="action-btn" id="exportBtn">📷 Export PNG</button>
+    <button class="action-btn secondary" id="clearBtn">🗑️ Clear All</button>
+  </div>
+
+  <div style="font-size:0.7rem;color:var(--muted);line-height:1.5;margin-top:auto">
+    Click to place blocks<br>
+    Scroll to zoom • Drag to pan<br>
+    Use Q/E to rotate view
+  </div>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="canvas"></canvas>
+
+  <div class="controls-overlay">
+    <button class="ctrl-btn" id="rotLeftBtn" title="Rotate Left (Q)">↺</button>
+    <button class="ctrl-btn" id="rotRightBtn" title="Rotate Right (E)">↻</button>
+    <button class="ctrl-btn" id="zoomInBtn" title="Zoom In">+</button>
+    <button class="ctrl-btn" id="zoomOutBtn" title="Zoom Out">−</button>
+    <button class="ctrl-btn" id="resetViewBtn" title="Reset View">⌂</button>
+  </div>
+
+  <div class="info-overlay" id="infoOverlay">
+    Blocks: <span id="blockCount">0</span><br>
+    Rotation: <span id="rotInfo">0°</span>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const COLORS = [
+  '#e94560','#f5a623','#f7dc6f','#58d68d','#2ecc71',
+  '#45b7d1','#5dade2','#7c6ff7','#bb6bd9','#e06c9f',
+  '#c0392b','#d35400','#8e6b3e','#6b4226','#34495e',
+  '#95a5a6','#ecf0f1','#1abc9c','#2c3e50','#e74c3c'
+];
+
+let gridSize = 12;
+let voxels = {};
+let currentColor = 0;
+let currentTool = 'place';
+let rotation = 0;
+let zoom = 1;
+let panX = 0, panY = 0;
+let tileW = 40, tileH = 20;
+let isDragging = false;
+let dragStart = null;
+let lastMouse = null;
+let hoveredCell = null;
+
+function key(x, y, z) { return `${x},${y},${z}`; }
+function parseKey(k) { return k.split(',').map(Number); }
+
+function initColors() {
+  const grid = document.getElementById('colorGrid');
+  COLORS.forEach((c, i) => {
+    const s = document.createElement('div');
+    s.className = 'color-swatch' + (i === 0 ? ' active' : '');
+    s.style.background = c;
+    s.addEventListener('click', () => {
+      document.querySelectorAll('.color-swatch').forEach(el => el.classList.remove('active'));
+      s.classList.add('active');
+      currentColor = i;
+    });
+    grid.appendChild(s);
+  });
+}
+
+function setTool(tool) {
+  currentTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === tool);
+  });
+}
+
+function toIso(gx, gy, gz) {
+  let rx = gx, ry = gy;
+  for (let r = 0; r < rotation; r++) {
+    const tmp = rx;
+    rx = ry;
+    ry = gridSize - 1 - tmp;
+  }
+  const sx = (rx - ry) * tileW * 0.5 * zoom;
+  const sy = (rx + ry) * tileH * 0.5 * zoom - gz * tileH * zoom;
+  return { x: sx + panX + canvas.width / 2, y: sy + panY + canvas.height / 2 };
+}
+
+function fromScreen(sx, sy, targetZ) {
+  const cx = sx - panX - canvas.width / 2;
+  const cy = sy - panY - canvas.height / 2 + targetZ * tileH * zoom;
+  const tw = tileW * 0.5 * zoom;
+  const th = tileH * 0.5 * zoom;
+  const gxr = (cx / tw + cy / th) / 2;
+  const gyr = (cy / th - cx / tw) / 2;
+  let rx = Math.floor(gxr);
+  let ry = Math.floor(gyr);
+  for (let r = 0; r < rotation; r++) {
+    const tmp = rx;
+    rx = gridSize - 1 - ry;
+    ry = tmp;
+  }
+  return { x: rx, y: ry, z: targetZ };
+}
+
+function inBounds(x, y) {
+  return x >= 0 && x < gridSize && y >= 0 && y < gridSize;
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+
+function rgbStr(r,g,b) { return `rgb(${r},${g},${b})`; }
+
+function darken(hex, factor) {
+  const {r,g,b} = hexToRgb(hex);
+  return rgbStr(Math.floor(r*factor), Math.floor(g*factor), Math.floor(b*factor));
+}
+
+function drawBlock(x, y, z, colorIdx, highlight) {
+  const color = COLORS[colorIdx];
+  const p = toIso(x, y, z);
+  const w = tileW * 0.5 * zoom;
+  const h = tileH * 0.5 * zoom;
+  const blockH = tileH * zoom;
+
+  const top = darken(color, highlight ? 1.2 : 1.0);
+  const left = darken(color, highlight ? 0.85 : 0.7);
+  const right = darken(color, highlight ? 0.7 : 0.55);
+
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y - blockH);
+  ctx.lineTo(p.x + w, p.y - blockH + h);
+  ctx.lineTo(p.x, p.y - blockH + 2*h);
+  ctx.lineTo(p.x - w, p.y - blockH + h);
+  ctx.closePath();
+  ctx.fillStyle = top;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(p.x - w, p.y - blockH + h);
+  ctx.lineTo(p.x, p.y - blockH + 2*h);
+  ctx.lineTo(p.x, p.y + 2*h - blockH + blockH);
+  ctx.lineTo(p.x - w, p.y + h - blockH + blockH);
+  ctx.closePath();
+  ctx.fillStyle = left;
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(p.x + w, p.y - blockH + h);
+  ctx.lineTo(p.x, p.y - blockH + 2*h);
+  ctx.lineTo(p.x, p.y + 2*h - blockH + blockH);
+  ctx.lineTo(p.x + w, p.y + h - blockH + blockH);
+  ctx.closePath();
+  ctx.fillStyle = right;
+  ctx.fill();
+  ctx.stroke();
+
+  if (highlight) {
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - blockH);
+    ctx.lineTo(p.x + w, p.y - blockH + h);
+    ctx.lineTo(p.x, p.y - blockH + 2*h);
+    ctx.lineTo(p.x - w, p.y - blockH + h);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fill();
+  }
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(100,100,160,0.15)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= gridSize; x++) {
+    const p1 = toIso(x, 0, 0);
+    const p2 = toIso(x, gridSize, 0);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= gridSize; y++) {
+    const p1 = toIso(0, y, 0);
+    const p2 = toIso(gridSize, y, 0);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+}
+
+function getSortedVoxels() {
+  const entries = Object.entries(voxels);
+  entries.sort((a, b) => {
+    const [ax, ay, az] = parseKey(a[0]);
+    const [bx, by, bz] = parseKey(b[0]);
+    let arx = ax, ary = ay, brx = bx, bry = by;
+    for (let r = 0; r < rotation; r++) {
+      let tmp = arx; arx = ary; ary = gridSize - 1 - tmp;
+      tmp = brx; brx = bry; bry = gridSize - 1 - tmp;
+    }
+    const aDepth = arx + ary + az * 0.01;
+    const bDepth = brx + bry + bz * 0.01;
+    return aDepth - bDepth;
+  });
+  return entries;
+}
+
+function render() {
+  canvas.width = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight;
+
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const grad = ctx.createRadialGradient(
+    canvas.width/2, canvas.height/2, 0,
+    canvas.width/2, canvas.height/2, canvas.width * 0.6
+  );
+  grad.addColorStop(0, 'rgba(30,30,60,1)');
+  grad.addColorStop(1, 'rgba(26,26,46,1)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawGrid();
+
+  const layerVal = parseInt(document.getElementById('layerSlider').value);
+  const sorted = getSortedVoxels();
+
+  for (const [k, colorIdx] of sorted) {
+    const [x, y, z] = parseKey(k);
+    const isHover = hoveredCell && hoveredCell.x === x && hoveredCell.y === y && hoveredCell.z === z;
+    drawBlock(x, y, z, colorIdx, isHover);
+  }
+
+  if (hoveredCell && inBounds(hoveredCell.x, hoveredCell.y) && currentTool === 'place' && !voxels[key(hoveredCell.x, hoveredCell.y, hoveredCell.z)]) {
+    ctx.globalAlpha = 0.4;
+    drawBlock(hoveredCell.x, hoveredCell.y, hoveredCell.z, currentColor, true);
+    ctx.globalAlpha = 1;
+  }
+
+  document.getElementById('blockCount').textContent = Object.keys(voxels).length;
+  document.getElementById('rotInfo').textContent = (rotation * 90) + '°';
+
+  requestAnimationFrame(render);
+}
+
+function getTargetZ(gx, gy) {
+  const layerVal = parseInt(document.getElementById('layerSlider').value);
+  if (currentTool === 'place') {
+    for (let z = 15; z >= 0; z--) {
+      if (voxels[key(gx, gy, z)]) return z + 1;
+    }
+    return layerVal;
+  }
+  if (currentTool === 'remove' || currentTool === 'paint' || currentTool === 'eyedrop') {
+    for (let z = 15; z >= 0; z--) {
+      if (voxels[key(gx, gy, z)]) return z;
+    }
+    return -1;
+  }
+  return layerVal;
+}
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (isDragging && dragStart) {
+    panX += mx - dragStart.x;
+    panY += my - dragStart.y;
+    dragStart = { x: mx, y: my };
+    hoveredCell = null;
+    return;
+  }
+
+  const layerVal = parseInt(document.getElementById('layerSlider').value);
+  let bestCell = null;
+  let bestDepth = -Infinity;
+
+  for (let z = 0; z <= 15; z++) {
+    const cell = fromScreen(mx, my, z);
+    if (!inBounds(cell.x, cell.y)) continue;
+    if (currentTool === 'place') {
+      const hasBelow = z === layerVal || voxels[key(cell.x, cell.y, z - 1)];
+      const isEmpty = !voxels[key(cell.x, cell.y, z)];
+      if (hasBelow && isEmpty) {
+        const depth = cell.x + cell.y + z;
+        if (depth > bestDepth) { bestDepth = depth; bestCell = cell; }
+      }
+    } else {
+      if (voxels[key(cell.x, cell.y, z)]) {
+        const depth = cell.x + cell.y + z;
+        if (depth > bestDepth) { bestDepth = depth; bestCell = cell; }
+      }
+    }
+  }
+  hoveredCell = bestCell;
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && e.shiftKey)) {
+    isDragging = true;
+    const rect = canvas.getBoundingClientRect();
+    dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    e.preventDefault();
+    return;
+  }
+
+  if (!hoveredCell || !inBounds(hoveredCell.x, hoveredCell.y)) return;
+  const k = key(hoveredCell.x, hoveredCell.y, hoveredCell.z);
+
+  if (currentTool === 'place' && hoveredCell.z >= 0 && hoveredCell.z <= 15) {
+    if (!voxels[k]) voxels[k] = currentColor;
+  } else if (currentTool === 'remove') {
+    delete voxels[k];
+  } else if (currentTool === 'paint') {
+    if (voxels[k] !== undefined) voxels[k] = currentColor;
+  } else if (currentTool === 'eyedrop') {
+    if (voxels[k] !== undefined) {
+      currentColor = voxels[k];
+      document.querySelectorAll('.color-swatch').forEach((s, i) => {
+        s.classList.toggle('active', i === currentColor);
+      });
+      setTool('place');
+    }
+  }
+});
+
+canvas.addEventListener('mouseup', () => { isDragging = false; dragStart = null; });
+canvas.addEventListener('mouseleave', () => { isDragging = false; dragStart = null; hoveredCell = null; });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  zoom = Math.max(0.3, Math.min(3, zoom * factor));
+}, { passive: false });
+
+document.querySelectorAll('.tool-btn').forEach(b => {
+  b.addEventListener('click', () => setTool(b.dataset.tool));
+});
+
+document.getElementById('layerSlider').addEventListener('input', (e) => {
+  document.getElementById('layerVal').textContent = e.target.value;
+});
+
+document.getElementById('gridSlider').addEventListener('input', (e) => {
+  gridSize = parseInt(e.target.value);
+  document.getElementById('gridVal').textContent = gridSize;
+  const newVoxels = {};
+  for (const [k, v] of Object.entries(voxels)) {
+    const [x, y, z] = parseKey(k);
+    if (x < gridSize && y < gridSize) newVoxels[k] = v;
+  }
+  voxels = newVoxels;
+});
+
+document.getElementById('rotLeftBtn').addEventListener('click', () => { rotation = (rotation + 3) % 4; });
+document.getElementById('rotRightBtn').addEventListener('click', () => { rotation = (rotation + 1) % 4; });
+document.getElementById('zoomInBtn').addEventListener('click', () => { zoom = Math.min(3, zoom * 1.2); });
+document.getElementById('zoomOutBtn').addEventListener('click', () => { zoom = Math.max(0.3, zoom / 1.2); });
+document.getElementById('resetViewBtn').addEventListener('click', () => { zoom = 1; panX = 0; panY = 0; rotation = 0; });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'q' || e.key === 'Q') rotation = (rotation + 3) % 4;
+  if (e.key === 'e' || e.key === 'E') rotation = (rotation + 1) % 4;
+  if (e.key === '1') setTool('place');
+  if (e.key === '2') setTool('remove');
+  if (e.key === '3') setTool('paint');
+  if (e.key === '4') setTool('eyedrop');
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => { voxels = {}; });
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'voxel-build.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+function loadPreset(name) {
+  voxels = {};
+  const s = Math.min(gridSize, 12);
+  const cx = Math.floor(gridSize / 2);
+  const cy = Math.floor(gridSize / 2);
+
+  if (name === 'house') {
+    for (let x = -2; x <= 2; x++) for (let y = -2; y <= 2; y++) {
+      for (let z = 0; z < 3; z++) {
+        if (x === 0 && y === -2 && z < 2) continue;
+        voxels[key(cx+x, cy+y, z)] = 16;
+      }
+    }
+    for (let x = -2; x <= 2; x++) for (let y = -2; y <= 2; y++) {
+      const h = 3 - Math.max(Math.abs(x), Math.abs(y));
+      if (h > 0) {
+        for (let dz = 0; dz < h; dz++) voxels[key(cx+x, cy+y, 3+dz)] = 0;
+      }
+    }
+    voxels[key(cx, cy-2, 0)] = 12;
+    voxels[key(cx-1, cy+1, 1)] = 6;
+    voxels[key(cx+1, cy+1, 1)] = 6;
+  } else if (name === 'castle') {
+    for (let x = -3; x <= 3; x++) for (let y = -3; y <= 3; y++) {
+      voxels[key(cx+x, cy+y, 0)] = 15;
+    }
+    for (let i = -3; i <= 3; i++) {
+      for (let z = 1; z <= 3; z++) {
+        voxels[key(cx+i, cy-3, z)] = 15;
+        voxels[key(cx+i, cy+3, z)] = 15;
+        voxels[key(cx-3, cy+i, z)] = 15;
+        voxels[key(cx+3, cy+i, z)] = 15;
+      }
+    }
+    [[-3,-3],[3,-3],[-3,3],[3,3]].forEach(([dx,dy]) => {
+      for (let z = 1; z <= 5; z++) voxels[key(cx+dx, cy+dy, z)] = 14;
+      voxels[key(cx+dx, cy+dy, 5)] = 0;
+    });
+    for (let i = -3; i <= 3; i += 2) {
+      voxels[key(cx+i, cy-3, 4)] = 15;
+      voxels[key(cx+i, cy+3, 4)] = 15;
+      voxels[key(cx-3, cy+i, 4)] = 15;
+      voxels[key(cx+3, cy+i, 4)] = 15;
+    }
+    delete voxels[key(cx, cy-3, 1)];
+    delete voxels[key(cx, cy-3, 2)];
+  } else if (name === 'tree') {
+    for (let z = 0; z < 5; z++) voxels[key(cx, cy, z)] = 12;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+      const dist = Math.abs(dx) + Math.abs(dy);
+      if (dist <= 3 && !(dx === 0 && dy === 0)) {
+        voxels[key(cx+dx, cy+dy, 4)] = 4;
+        if (dist <= 2) voxels[key(cx+dx, cy+dy, 5)] = 4;
+        if (dist <= 1) voxels[key(cx+dx, cy+dy, 6)] = 4;
+      }
+    }
+    voxels[key(cx, cy, 5)] = 4;
+    voxels[key(cx, cy, 6)] = 4;
+    voxels[key(cx, cy, 7)] = 4;
+  } else if (name === 'pyramid') {
+    const ps = Math.min(5, Math.floor(gridSize/2));
+    for (let z = 0; z < ps; z++) {
+      const r = ps - 1 - z;
+      for (let x = -r; x <= r; x++) for (let y = -r; y <= r; y++) {
+        voxels[key(cx+x, cy+y, z)] = 1;
+      }
+    }
+  } else if (name === 'tower') {
+    const r = 3;
+    for (let z = 0; z < 10; z++) {
+      const angle = z * 0.6;
+      const bx = Math.round(Math.cos(angle) * 2);
+      const by = Math.round(Math.sin(angle) * 2);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        if (Math.abs(dx) + Math.abs(dy) <= 1) {
+          voxels[key(cx+bx+dx, cy+by+dy, z)] = 7 + (z % 3);
+        }
+      }
+    }
+  } else if (name === 'arch') {
+    for (let x = -4; x <= 4; x++) {
+      voxels[key(cx+x, cy, 0)] = 14;
+      voxels[key(cx+x, cy+1, 0)] = 14;
+    }
+    for (let z = 0; z <= 4; z++) {
+      voxels[key(cx-4, cy, z)] = 15;
+      voxels[key(cx-4, cy+1, z)] = 15;
+      voxels[key(cx+4, cy, z)] = 15;
+      voxels[key(cx+4, cy+1, z)] = 15;
+    }
+    for (let x = -3; x <= 3; x++) {
+      const h = 4 + Math.round(Math.sqrt(9 - x*x));
+      voxels[key(cx+x, cy, h)] = 14;
+      voxels[key(cx+x, cy+1, h)] = 14;
+    }
+  }
+}
+
+document.querySelectorAll('.preset-btn').forEach(b => {
+  b.addEventListener('click', () => loadPreset(b.dataset.preset));
+});
+
+initColors();
+render();
+</script>
+</body>
+</html>

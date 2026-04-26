@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firework Show</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  canvas {
+    display: block;
+  }
+
+  #controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 10;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 90vw;
+  }
+
+  .btn {
+    padding: 8px 18px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    background: rgba(20,20,30,0.85);
+    color: #ddd;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: rgba(40,40,60,0.9); border-color: rgba(255,255,255,0.4); }
+  .btn.active { border-color: #7c6ff7; color: #fff; background: rgba(124,111,247,0.2); }
+
+  #hint {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255,255,255,0.4);
+    font-size: 1.1rem;
+    pointer-events: none;
+    transition: opacity 0.5s;
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  #info {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.78rem;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+
+  .color-swatch:hover { transform: scale(1.2); }
+  .color-swatch.active { border-color: #fff; transform: scale(1.15); }
+
+  .btn-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    background: rgba(20,20,30,0.85);
+    backdrop-filter: blur(10px);
+  }
+
+  .btn-group label {
+    color: rgba(255,255,255,0.5);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hint">Click anywhere to launch fireworks<br>Press SPACE for auto-show</div>
+<div id="info">Fireworks: <span id="count">0</span></div>
+
+<div id="controls">
+  <div class="btn-group">
+    <label>Type</label>
+    <button class="btn active" data-type="burst">Burst</button>
+    <button class="btn" data-type="ring">Ring</button>
+    <button class="btn" data-type="cascade">Cascade</button>
+    <button class="btn" data-type="palm">Palm</button>
+    <button class="btn" data-type="crossette">Crossette</button>
+    <button class="btn" data-type="random">Random</button>
+  </div>
+
+  <div class="btn-group">
+    <label>Color</label>
+    <div class="color-swatch active" data-color="random" style="background:conic-gradient(#f44,#ff0,#0f0,#0ff,#44f,#f0f,#f44)"></div>
+    <div class="color-swatch" data-color="#ff4444" style="background:#ff4444"></div>
+    <div class="color-swatch" data-color="#44aaff" style="background:#44aaff"></div>
+    <div class="color-swatch" data-color="#44ff88" style="background:#44ff88"></div>
+    <div class="color-swatch" data-color="#ffaa22" style="background:#ffaa22"></div>
+    <div class="color-swatch" data-color="#ff44ff" style="background:#ff44ff"></div>
+    <div class="color-swatch" data-color="#ffffff" style="background:#ffffff"></div>
+  </div>
+
+  <button class="btn" id="autoBtn">Auto Show</button>
+  <button class="btn" id="finaleBtn">Grand Finale</button>
+  <button class="btn" id="clearBtn">Clear Sky</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const hint = document.getElementById('hint');
+const countEl = document.getElementById('count');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const TYPES = ['burst', 'ring', 'cascade', 'palm', 'crossette'];
+let selectedType = 'burst';
+let selectedColor = 'random';
+let autoMode = false;
+let finaleMode = false;
+let finaleTimer = 0;
+let totalLaunched = 0;
+let hintVisible = true;
+
+const stars = [];
+for (let i = 0; i < 200; i++) {
+  stars.push({
+    x: Math.random() * 2000,
+    y: Math.random() * 2000,
+    r: Math.random() * 1.5 + 0.3,
+    twinkle: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.02 + 0.005
+  });
+}
+
+function randomColor() {
+  const hue = Math.random() * 360;
+  return `hsl(${hue}, 90%, 65%)`;
+}
+
+function hslToComponents(hsl) {
+  const temp = document.createElement('canvas').getContext('2d');
+  temp.fillStyle = hsl;
+  return temp.fillStyle;
+}
+
+function getColor() {
+  if (selectedColor === 'random') return randomColor();
+  return selectedColor;
+}
+
+class Particle {
+  constructor(x, y, vx, vy, color, life, size, gravity, drag, trail) {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.color = color;
+    this.life = life;
+    this.maxLife = life;
+    this.size = size;
+    this.gravity = gravity;
+    this.drag = drag;
+    this.trail = trail || false;
+    this.history = [];
+  }
+
+  update(dt) {
+    if (this.trail) {
+      this.history.push({ x: this.x, y: this.y });
+      if (this.history.length > 8) this.history.shift();
+    }
+    this.vx *= this.drag;
+    this.vy *= this.drag;
+    this.vy += this.gravity * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.life -= dt;
+    return this.life > 0;
+  }
+
+  draw(ctx) {
+    const alpha = Math.max(0, this.life / this.maxLife);
+    const a2 = alpha * alpha;
+
+    if (this.trail && this.history.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(this.history[0].x, this.history[0].y);
+      for (let i = 1; i < this.history.length; i++) {
+        ctx.lineTo(this.history[i].x, this.history[i].y);
+      }
+      ctx.lineTo(this.x, this.y);
+      ctx.strokeStyle = this.color.replace(')', `, ${a2 * 0.4})`).replace('rgb(', 'rgba(').replace('hsl(', 'hsla(');
+      ctx.lineWidth = this.size * 0.5;
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
+    ctx.fillStyle = this.color.replace(')', `, ${a2})`).replace('rgb(', 'rgba(').replace('hsl(', 'hsla(');
+    ctx.fill();
+
+    if (a2 > 0.5) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size * alpha * 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = this.color.replace(')', `, ${a2 * 0.15})`).replace('rgb(', 'rgba(').replace('hsl(', 'hsla(');
+      ctx.fill();
+    }
+  }
+}
+
+class Rocket {
+  constructor(x, targetY, color, type) {
+    this.x = x;
+    this.y = H;
+    this.targetY = targetY;
+    this.color = color;
+    this.type = type;
+    this.vy = -(H - targetY) / 40;
+    this.vx = (Math.random() - 0.5) * 2;
+    this.trail = [];
+    this.alive = true;
+    this.size = 2.5;
+  }
+
+  update(dt) {
+    this.trail.push({ x: this.x, y: this.y, alpha: 1 });
+    if (this.trail.length > 15) this.trail.shift();
+    for (const t of this.trail) t.alpha -= 0.07;
+
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.vy += 0.15 * dt;
+
+    if (this.y <= this.targetY || this.vy >= 0) {
+      this.alive = false;
+      explode(this.x, this.y, this.color, this.type);
+    }
+    return this.alive;
+  }
+
+  draw(ctx) {
+    for (const t of this.trail) {
+      if (t.alpha <= 0) continue;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 1.5 * t.alpha, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 220, 150, ${t.alpha * 0.6})`;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffe8b0';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 200, 100, 0.15)';
+    ctx.fill();
+  }
+}
+
+let particles = [];
+let rockets = [];
+
+function explode(x, y, color, type) {
+  const count = type === 'ring' ? 60 : type === 'cascade' ? 100 : type === 'palm' ? 80 : type === 'crossette' ? 40 : 90;
+
+  switch (type) {
+    case 'burst': {
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+        const speed = 2 + Math.random() * 4;
+        particles.push(new Particle(
+          x, y,
+          Math.cos(angle) * speed, Math.sin(angle) * speed,
+          color, 60 + Math.random() * 30, 2 + Math.random() * 1.5,
+          0.04, 0.985, true
+        ));
+      }
+      addCrackleSparks(x, y, 15);
+      break;
+    }
+    case 'ring': {
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count;
+        const speed = 3.5 + Math.random() * 0.5;
+        particles.push(new Particle(
+          x, y,
+          Math.cos(angle) * speed, Math.sin(angle) * speed,
+          color, 50 + Math.random() * 20, 2.2,
+          0.03, 0.988, true
+        ));
+      }
+      for (let i = 0; i < 20; i++) {
+        const angle = (Math.PI * 2 * i) / 20;
+        const speed = 1.5;
+        particles.push(new Particle(
+          x, y,
+          Math.cos(angle) * speed, Math.sin(angle) * speed,
+          '#ffffff', 40, 1.5, 0.03, 0.98, false
+        ));
+      }
+      break;
+    }
+    case 'cascade': {
+      for (let i = 0; i < count; i++) {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.2;
+        const speed = 1.5 + Math.random() * 3.5;
+        particles.push(new Particle(
+          x, y,
+          Math.cos(angle) * speed, Math.sin(angle) * speed,
+          color, 80 + Math.random() * 50, 1.8 + Math.random(),
+          0.06, 0.982, true
+        ));
+      }
+      break;
+    }
+    case 'palm': {
+      const branches = 8;
+      for (let b = 0; b < branches; b++) {
+        const baseAngle = (Math.PI * 2 * b) / branches;
+        for (let i = 0; i < count / branches; i++) {
+          const angle = baseAngle + (Math.random() - 0.5) * 0.15;
+          const speed = 1 + i * 0.4 + Math.random() * 0.5;
+          particles.push(new Particle(
+            x, y,
+            Math.cos(angle) * speed, Math.sin(angle) * speed,
+            color, 70 + Math.random() * 30, 2 + Math.random(),
+            0.055, 0.98, true
+          ));
+        }
+      }
+      break;
+    }
+    case 'crossette': {
+      const arms = 6;
+      for (let a = 0; a < arms; a++) {
+        const baseAngle = (Math.PI * 2 * a) / arms;
+        const speed = 4;
+        const endX = x + Math.cos(baseAngle) * 80;
+        const endY = y + Math.sin(baseAngle) * 80;
+        particles.push(new Particle(
+          x, y,
+          Math.cos(baseAngle) * speed, Math.sin(baseAngle) * speed,
+          color, 25, 2.5, 0.03, 0.985, true
+        ));
+        setTimeout(() => {
+          for (let i = 0; i < 12; i++) {
+            const subAngle = (Math.PI * 2 * i) / 12;
+            const subSpeed = 1.5 + Math.random() * 1.5;
+            particles.push(new Particle(
+              endX, endY,
+              Math.cos(subAngle) * subSpeed, Math.sin(subAngle) * subSpeed,
+              color, 45 + Math.random() * 20, 1.8,
+              0.04, 0.985, true
+            ));
+          }
+          addCrackleSparks(endX, endY, 8);
+        }, 400);
+      }
+      break;
+    }
+  }
+}
+
+function addCrackleSparks(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.5 + Math.random() * 2;
+    particles.push(new Particle(
+      x + (Math.random() - 0.5) * 20,
+      y + (Math.random() - 0.5) * 20,
+      Math.cos(angle) * speed, Math.sin(angle) * speed,
+      '#fff8e0', 20 + Math.random() * 15, 1,
+      0.05, 0.97, false
+    ));
+  }
+}
+
+function launch(x, y) {
+  if (hintVisible) {
+    hint.style.opacity = '0';
+    hintVisible = false;
+  }
+
+  const type = selectedType === 'random'
+    ? TYPES[Math.floor(Math.random() * TYPES.length)]
+    : selectedType;
+
+  const color = getColor();
+  const targetY = y || H * 0.15 + Math.random() * H * 0.35;
+  rockets.push(new Rocket(x, targetY, color, type));
+  totalLaunched++;
+  countEl.textContent = totalLaunched;
+}
+
+let autoInterval = 0;
+function toggleAuto() {
+  autoMode = !autoMode;
+  document.getElementById('autoBtn').classList.toggle('active', autoMode);
+  if (autoMode && hintVisible) {
+    hint.style.opacity = '0';
+    hintVisible = false;
+  }
+}
+
+function startFinale() {
+  finaleMode = true;
+  finaleTimer = 180;
+  document.getElementById('finaleBtn').classList.toggle('active', true);
+  if (hintVisible) {
+    hint.style.opacity = '0';
+    hintVisible = false;
+  }
+}
+
+document.querySelectorAll('[data-type]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedType = btn.dataset.type;
+  });
+});
+
+document.querySelectorAll('[data-color]').forEach(swatch => {
+  swatch.addEventListener('click', () => {
+    document.querySelectorAll('[data-color]').forEach(s => s.classList.remove('active'));
+    swatch.classList.add('active');
+    selectedColor = swatch.dataset.color;
+  });
+});
+
+document.getElementById('autoBtn').addEventListener('click', toggleAuto);
+document.getElementById('finaleBtn').addEventListener('click', startFinale);
+document.getElementById('clearBtn').addEventListener('click', () => {
+  particles = [];
+  rockets = [];
+});
+
+canvas.addEventListener('click', (e) => {
+  launch(e.clientX, e.clientY);
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button === 0) {
+    const interval = setInterval(() => launch(
+      e.clientX + (Math.random() - 0.5) * 80,
+      e.clientY + (Math.random() - 0.5) * 60
+    ), 120);
+    const up = () => { clearInterval(interval); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mouseup', up);
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    toggleAuto();
+  }
+});
+
+let lastTime = performance.now();
+
+function drawStars(time) {
+  for (const s of stars) {
+    const sx = s.x % W;
+    const sy = s.y % H;
+    const twinkle = 0.4 + 0.6 * Math.sin(time * s.speed + s.twinkle);
+    ctx.beginPath();
+    ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${twinkle * 0.6})`;
+    ctx.fill();
+  }
+}
+
+function drawGround() {
+  const grd = ctx.createLinearGradient(0, H - 60, 0, H);
+  grd.addColorStop(0, 'rgba(10, 10, 20, 0)');
+  grd.addColorStop(1, 'rgba(10, 15, 25, 0.8)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, H - 60, W, 60);
+
+  const skyGlow = ctx.createRadialGradient(W / 2, H, 0, W / 2, H, H * 0.7);
+  skyGlow.addColorStop(0, 'rgba(30, 20, 50, 0.3)');
+  skyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = skyGlow;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function loop(time) {
+  const dt = Math.min((time - lastTime) / 16.667, 3);
+  lastTime = time;
+
+  ctx.fillStyle = 'rgba(0, 0, 5, 0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  drawStars(time);
+  drawGround();
+
+  rockets = rockets.filter(r => {
+    r.update(dt);
+    r.draw(ctx);
+    return r.alive;
+  });
+
+  particles = particles.filter(p => {
+    const alive = p.update(dt);
+    if (alive) p.draw(ctx);
+    return alive;
+  });
+
+  if (autoMode) {
+    autoInterval += dt;
+    if (autoInterval > 25 + Math.random() * 30) {
+      autoInterval = 0;
+      launch(W * 0.15 + Math.random() * W * 0.7);
+    }
+  }
+
+  if (finaleMode) {
+    finaleTimer -= dt;
+    if (finaleTimer > 120) {
+      if (Math.random() < 0.3) launch(W * 0.1 + Math.random() * W * 0.8);
+    } else if (finaleTimer > 60) {
+      if (Math.random() < 0.5) launch(W * 0.1 + Math.random() * W * 0.8);
+    } else if (finaleTimer > 0) {
+      if (Math.random() < 0.7) launch(W * 0.05 + Math.random() * W * 0.9);
+      if (Math.random() < 0.3) launch(W * 0.05 + Math.random() * W * 0.9);
+    } else {
+      finaleMode = false;
+      document.getElementById('finaleBtn').classList.remove('active');
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

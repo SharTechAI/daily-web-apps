@@ -66,6 +66,18 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "logic-gate-simulator", "-l", "3466"],
       "port": 3466
+    },
+    {
+      "name": "firework-show",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "firework-show", "-l", "3467"],
+      "port": 3467
+    },
+    {
+      "name": "isometric-voxel-builder",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "isometric-voxel-builder", "-l", "3468"],
+      "port": 3468
     }
   ]
 }
