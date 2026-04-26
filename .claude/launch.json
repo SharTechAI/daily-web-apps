@@ -102,6 +102,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "ant-colony-simulation", "-l", "3472"],
       "port": 3472
+    },
+    {
+      "name": "bioluminescent-ocean",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "bioluminescent-ocean", "-l", "3473"],
+      "port": 3473
     }
   ]
 }

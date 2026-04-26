@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bioluminescent Ocean</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; }
+canvas { display: block; }
+
+#controls {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: rgba(0,10,30,0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(80,180,255,0.15);
+  border-radius: 14px;
+  padding: 18px;
+  width: 240px;
+  color: #a0d8ff;
+  font-size: 12px;
+  z-index: 10;
+  transition: transform 0.3s;
+}
+
+#controls.collapsed { transform: translateX(260px); }
+
+#toggle-btn {
+  position: fixed;
+  top: 16px;
+  right: 268px;
+  background: rgba(0,10,30,0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(80,180,255,0.15);
+  border-radius: 10px;
+  color: #a0d8ff;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  z-index: 11;
+  transition: right 0.3s;
+}
+
+#toggle-btn.shifted { right: 16px; }
+
+h3 { font-size: 13px; margin-bottom: 12px; color: #7fdbff; letter-spacing: 0.5px; }
+
+.group { margin-bottom: 14px; }
+.group label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.group label span { color: #5a9fc0; }
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  background: rgba(80,180,255,0.2);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #7fdbff;
+  cursor: pointer;
+}
+
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.preset-btn {
+  background: rgba(80,180,255,0.1);
+  border: 1px solid rgba(80,180,255,0.2);
+  color: #a0d8ff;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+.preset-btn:hover, .preset-btn.active {
+  background: rgba(80,180,255,0.3);
+  border-color: #7fdbff;
+}
+
+#hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(120,200,255,0.5);
+  font-size: 12px;
+  pointer-events: none;
+  transition: opacity 2s;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="toggle-btn">⚙</button>
+
+<div id="controls">
+  <h3>🌊 Bioluminescent Ocean</h3>
+
+  <div class="group">
+    <label>Jellyfish <span id="v-jelly">8</span></label>
+    <input type="range" id="r-jelly" min="0" max="20" value="8">
+  </div>
+  <div class="group">
+    <label>Plankton Density <span id="v-plankton">300</span></label>
+    <input type="range" id="r-plankton" min="50" max="800" value="300" step="10">
+  </div>
+  <div class="group">
+    <label>Deep Fish <span id="v-fish">5</span></label>
+    <input type="range" id="r-fish" min="0" max="15" value="5">
+  </div>
+  <div class="group">
+    <label>Glow Intensity <span id="v-glow">70</span></label>
+    <input type="range" id="r-glow" min="10" max="100" value="70">
+  </div>
+  <div class="group">
+    <label>Current Speed <span id="v-current">50</span></label>
+    <input type="range" id="r-current" min="0" max="100" value="50">
+  </div>
+  <div class="group">
+    <label>Depth <span id="v-depth">50</span></label>
+    <input type="range" id="r-depth" min="0" max="100" value="50">
+  </div>
+
+  <div class="presets">
+    <button class="preset-btn active" data-preset="abyss">Abyss</button>
+    <button class="preset-btn" data-preset="shallows">Shallows</button>
+    <button class="preset-btn" data-preset="bloom">Bloom</button>
+    <button class="preset-btn" data-preset="swarm">Swarm</button>
+    <button class="preset-btn" data-preset="void">Void</button>
+    <button class="preset-btn" data-preset="reef">Reef</button>
+  </div>
+</div>
+
+<div id="hint">Move your mouse to disturb the water — click to create a shockwave</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const toggleBtn = document.getElementById('toggle-btn');
+const controls = document.getElementById('controls');
+let panelOpen = true;
+toggleBtn.addEventListener('click', () => {
+  panelOpen = !panelOpen;
+  controls.classList.toggle('collapsed', !panelOpen);
+  toggleBtn.classList.toggle('shifted', !panelOpen);
+});
+
+let mouse = { x: W / 2, y: H / 2, active: false };
+let shockwaves = [];
+
+canvas.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.active = true;
+  const hint = document.getElementById('hint');
+  if (hint) hint.style.opacity = '0';
+});
+canvas.addEventListener('mouseleave', () => mouse.active = false);
+canvas.addEventListener('click', e => {
+  shockwaves.push({ x: e.clientX, y: e.clientY, r: 0, maxR: 300, opacity: 1 });
+});
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  mouse.x = t.clientX;
+  mouse.y = t.clientY;
+  mouse.active = true;
+  shockwaves.push({ x: t.clientX, y: t.clientY, r: 0, maxR: 300, opacity: 1 });
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  mouse.x = e.touches[0].clientX;
+  mouse.y = e.touches[0].clientY;
+});
+
+const cfg = {
+  jellyfish: 8, plankton: 300, fish: 5,
+  glow: 70, current: 50, depth: 50
+};
+
+const sliders = ['jelly','plankton','fish','glow','current','depth'];
+const cfgKeys = ['jellyfish','plankton','fish','glow','current','depth'];
+sliders.forEach((s, i) => {
+  const el = document.getElementById('r-' + s);
+  el.addEventListener('input', () => {
+    cfg[cfgKeys[i]] = +el.value;
+    document.getElementById('v-' + s).textContent = el.value;
+    if (cfgKeys[i] === 'plankton') initPlankton();
+    if (cfgKeys[i] === 'jellyfish') initJellyfish();
+    if (cfgKeys[i] === 'fish') initFish();
+  });
+});
+
+const presets = {
+  abyss:    { jellyfish: 8,  plankton: 300, fish: 5,  glow: 70,  current: 50, depth: 50 },
+  shallows: { jellyfish: 4,  plankton: 600, fish: 8,  glow: 90,  current: 30, depth: 10 },
+  bloom:    { jellyfish: 18, plankton: 800, fish: 2,  glow: 100, current: 20, depth: 30 },
+  swarm:    { jellyfish: 3,  plankton: 100, fish: 15, glow: 50,  current: 80, depth: 60 },
+  void:     { jellyfish: 2,  plankton: 50,  fish: 0,  glow: 30,  current: 10, depth: 100 },
+  reef:     { jellyfish: 6,  plankton: 500, fish: 10, glow: 80,  current: 40, depth: 20 },
+};
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const p = presets[btn.dataset.preset];
+    Object.assign(cfg, p);
+    sliders.forEach((s, i) => {
+      document.getElementById('r-' + s).value = cfg[cfgKeys[i]];
+      document.getElementById('v-' + s).textContent = cfg[cfgKeys[i]];
+    });
+    initPlankton();
+    initJellyfish();
+    initFish();
+  });
+});
+
+class Jellyfish {
+  constructor() { this.reset(); }
+  reset() {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.size = 20 + Math.random() * 40;
+    this.pulseSpeed = 0.5 + Math.random() * 1.5;
+    this.pulsePhase = Math.random() * Math.PI * 2;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.vy = -0.2 - Math.random() * 0.5;
+    this.tentacleCount = 5 + Math.floor(Math.random() * 6);
+    const hues = [200, 220, 260, 280, 300, 180, 160];
+    this.hue = hues[Math.floor(Math.random() * hues.length)];
+    this.sat = 60 + Math.random() * 40;
+    this.glowPhase = Math.random() * Math.PI * 2;
+  }
+
+  update(t, dt) {
+    const currentStr = cfg.current / 100;
+    this.x += (this.vx + Math.sin(t * 0.3 + this.pulsePhase) * 0.3) * currentStr + Math.sin(t * 0.1) * 0.2;
+    const pulse = Math.sin(t * this.pulseSpeed + this.pulsePhase);
+    this.vy += pulse * 0.01;
+    this.y += this.vy * 0.5;
+
+    if (mouse.active) {
+      const dx = this.x - mouse.x;
+      const dy = this.y - mouse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 200) {
+        const force = (200 - dist) / 200 * 0.5;
+        this.x += dx / dist * force;
+        this.y += dy / dist * force;
+      }
+    }
+
+    shockwaves.forEach(sw => {
+      const dx = this.x - sw.x;
+      const dy = this.y - sw.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (Math.abs(dist - sw.r) < 50) {
+        const force = sw.opacity * 3;
+        this.x += dx / dist * force;
+        this.y += dy / dist * force;
+      }
+    });
+
+    if (this.y < -this.size * 2) this.y = H + this.size * 2;
+    if (this.y > H + this.size * 2) this.y = -this.size * 2;
+    if (this.x < -this.size * 2) this.x = W + this.size * 2;
+    if (this.x > W + this.size * 2) this.x = -this.size * 2;
+  }
+
+  draw(t) {
+    const pulse = Math.sin(t * this.pulseSpeed + this.pulsePhase);
+    const glowPulse = (Math.sin(t * 2 + this.glowPhase) * 0.5 + 0.5);
+    const glowStr = cfg.glow / 100;
+    const bellW = this.size * (0.8 + pulse * 0.2);
+    const bellH = this.size * (0.6 + pulse * 0.15);
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    const outerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size * 2.5);
+    outerGlow.addColorStop(0, `hsla(${this.hue},${this.sat}%,70%,${0.15 * glowStr * glowPulse})`);
+    outerGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = outerGlow;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.size * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-bellW, 0);
+    ctx.quadraticCurveTo(-bellW, -bellH * 1.5, 0, -bellH * 1.2);
+    ctx.quadraticCurveTo(bellW, -bellH * 1.5, bellW, 0);
+    ctx.quadraticCurveTo(bellW * 0.8, bellH * 0.3, 0, bellH * 0.2);
+    ctx.quadraticCurveTo(-bellW * 0.8, bellH * 0.3, -bellW, 0);
+    ctx.closePath();
+
+    const bellGrad = ctx.createRadialGradient(0, -bellH * 0.3, 0, 0, 0, this.size);
+    bellGrad.addColorStop(0, `hsla(${this.hue},${this.sat}%,80%,${0.4 * glowStr})`);
+    bellGrad.addColorStop(0.5, `hsla(${this.hue},${this.sat}%,50%,${0.25 * glowStr})`);
+    bellGrad.addColorStop(1, `hsla(${this.hue},${this.sat}%,30%,${0.1 * glowStr})`);
+    ctx.fillStyle = bellGrad;
+    ctx.fill();
+
+    ctx.strokeStyle = `hsla(${this.hue},${this.sat}%,80%,${0.3 * glowStr * (0.5 + glowPulse * 0.5)})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    for (let i = 0; i < this.tentacleCount; i++) {
+      const tx = ((i / (this.tentacleCount - 1)) - 0.5) * bellW * 1.6;
+      const tentLen = this.size * (1.5 + Math.sin(t + i) * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(tx, bellH * 0.15);
+      const segments = 8;
+      for (let j = 1; j <= segments; j++) {
+        const frac = j / segments;
+        const sx = tx + Math.sin(t * 2 + i * 0.7 + j * 0.5) * (10 + frac * 15) * (cfg.current / 50);
+        const sy = bellH * 0.15 + frac * tentLen;
+        ctx.lineTo(sx, sy);
+      }
+      ctx.strokeStyle = `hsla(${this.hue},${this.sat}%,70%,${(0.3 - 0.2 * (i / this.tentacleCount)) * glowStr})`;
+      ctx.lineWidth = 2 - (i / this.tentacleCount);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
+class Plankton {
+  constructor() { this.reset(true); }
+  reset(initial) {
+    this.x = initial ? Math.random() * W : (Math.random() < 0.5 ? -10 : W + 10);
+    this.y = Math.random() * H;
+    this.size = 1 + Math.random() * 3;
+    this.baseAlpha = 0.3 + Math.random() * 0.7;
+    this.flickerSpeed = 1 + Math.random() * 4;
+    this.flickerPhase = Math.random() * Math.PI * 2;
+    this.vx = (Math.random() - 0.5) * 0.5;
+    this.vy = (Math.random() - 0.5) * 0.3;
+    const hues = [180, 200, 220, 280, 300, 120, 60];
+    this.hue = hues[Math.floor(Math.random() * hues.length)];
+    this.excited = 0;
+  }
+
+  update(t) {
+    const currentStr = cfg.current / 100;
+    this.x += this.vx * currentStr + Math.sin(t * 0.5 + this.flickerPhase) * 0.2;
+    this.y += this.vy * currentStr + Math.cos(t * 0.3 + this.flickerPhase) * 0.15;
+
+    if (mouse.active) {
+      const dx = this.x - mouse.x;
+      const dy = this.y - mouse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 150) {
+        this.excited = Math.max(this.excited, (150 - dist) / 150);
+      }
+    }
+
+    shockwaves.forEach(sw => {
+      const dx = this.x - sw.x;
+      const dy = this.y - sw.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (Math.abs(dist - sw.r) < 40) {
+        this.excited = 1;
+        this.x += dx / dist * sw.opacity * 2;
+        this.y += dy / dist * sw.opacity * 2;
+      }
+    });
+
+    this.excited *= 0.97;
+
+    if (this.x < -20 || this.x > W + 20 || this.y < -20 || this.y > H + 20) {
+      this.reset(false);
+      this.x = Math.random() * W;
+      this.y = Math.random() * H;
+    }
+  }
+
+  draw(t) {
+    const flicker = Math.sin(t * this.flickerSpeed + this.flickerPhase) * 0.5 + 0.5;
+    const alpha = (this.baseAlpha * flicker + this.excited) * (cfg.glow / 100);
+    const r = this.size + this.excited * 3;
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue},80%,${60 + this.excited * 30}%,${Math.min(1, alpha)})`;
+    ctx.fill();
+
+    if (alpha > 0.3) {
+      const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r * 4);
+      glow.addColorStop(0, `hsla(${this.hue},80%,70%,${alpha * 0.3})`);
+      glow.addColorStop(1, 'transparent');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, r * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+class DeepFish {
+  constructor() { this.reset(); }
+  reset() {
+    this.dir = Math.random() < 0.5 ? 1 : -1;
+    this.x = this.dir > 0 ? -60 : W + 60;
+    this.y = Math.random() * H;
+    this.speed = 0.5 + Math.random() * 1.5;
+    this.size = 15 + Math.random() * 25;
+    this.wobblePhase = Math.random() * Math.PI * 2;
+    this.wobbleSpeed = 2 + Math.random() * 3;
+    const fishHues = [190, 210, 250, 270, 300, 160];
+    this.hue = fishHues[Math.floor(Math.random() * fishHues.length)];
+    this.glowPhase = Math.random() * Math.PI * 2;
+    this.spots = [];
+    const spotCount = 2 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < spotCount; i++) {
+      this.spots.push({
+        ox: (Math.random() - 0.3) * this.size * 0.8,
+        oy: (Math.random() - 0.5) * this.size * 0.4,
+        r: 1 + Math.random() * 3,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  update(t) {
+    const currentStr = cfg.current / 100;
+    this.x += this.speed * this.dir * (0.5 + currentStr * 0.5);
+    this.y += Math.sin(t * this.wobbleSpeed + this.wobblePhase) * 0.5;
+
+    if (mouse.active) {
+      const dx = this.x - mouse.x;
+      const dy = this.y - mouse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 180) {
+        const force = (180 - dist) / 180;
+        this.x += dx / dist * force * 2;
+        this.y += dy / dist * force * 2;
+      }
+    }
+
+    if ((this.dir > 0 && this.x > W + 80) || (this.dir < 0 && this.x < -80)) {
+      this.reset();
+    }
+  }
+
+  draw(t) {
+    const glowStr = cfg.glow / 100;
+    const glowPulse = Math.sin(t * 1.5 + this.glowPhase) * 0.3 + 0.7;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(this.dir, 1);
+
+    const outerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size * 2);
+    outerGlow.addColorStop(0, `hsla(${this.hue},70%,60%,${0.1 * glowStr * glowPulse})`);
+    outerGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = outerGlow;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.size * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(this.size, 0);
+    ctx.quadraticCurveTo(this.size * 0.5, -this.size * 0.5, -this.size * 0.3, -this.size * 0.3);
+    ctx.quadraticCurveTo(-this.size * 0.8, 0, -this.size * 0.3, this.size * 0.3);
+    ctx.quadraticCurveTo(this.size * 0.5, this.size * 0.5, this.size, 0);
+    ctx.closePath();
+
+    const bodyGrad = ctx.createLinearGradient(0, -this.size * 0.5, 0, this.size * 0.5);
+    bodyGrad.addColorStop(0, `hsla(${this.hue},60%,40%,${0.4 * glowStr})`);
+    bodyGrad.addColorStop(0.5, `hsla(${this.hue},70%,50%,${0.5 * glowStr})`);
+    bodyGrad.addColorStop(1, `hsla(${this.hue},60%,30%,${0.3 * glowStr})`);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+
+    const tailWag = Math.sin(t * this.wobbleSpeed * 2 + this.wobblePhase) * 8;
+    ctx.beginPath();
+    ctx.moveTo(-this.size * 0.3, -this.size * 0.15);
+    ctx.lineTo(-this.size * 0.8 + tailWag, -this.size * 0.35);
+    ctx.lineTo(-this.size * 0.8 + tailWag, this.size * 0.35);
+    ctx.lineTo(-this.size * 0.3, this.size * 0.15);
+    ctx.closePath();
+    ctx.fillStyle = `hsla(${this.hue},60%,45%,${0.35 * glowStr})`;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(this.size * 0.5, -this.size * 0.1, this.size * 0.08, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue},80%,90%,${0.8 * glowStr})`;
+    ctx.fill();
+
+    this.spots.forEach(sp => {
+      const spGlow = Math.sin(t * 2 + sp.phase) * 0.3 + 0.7;
+      ctx.beginPath();
+      ctx.arc(sp.ox, sp.oy, sp.r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${(this.hue + 40) % 360},80%,75%,${0.6 * glowStr * spGlow})`;
+      ctx.fill();
+
+      const spGlowGrad = ctx.createRadialGradient(sp.ox, sp.oy, 0, sp.ox, sp.oy, sp.r * 4);
+      spGlowGrad.addColorStop(0, `hsla(${(this.hue + 40) % 360},80%,75%,${0.2 * glowStr * spGlow})`);
+      spGlowGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = spGlowGrad;
+      ctx.beginPath();
+      ctx.arc(sp.ox, sp.oy, sp.r * 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.restore();
+  }
+}
+
+let jellyfish = [];
+let planktonArr = [];
+let fishArr = [];
+
+function initJellyfish() {
+  while (jellyfish.length < cfg.jellyfish) jellyfish.push(new Jellyfish());
+  jellyfish.length = cfg.jellyfish;
+}
+
+function initPlankton() {
+  while (planktonArr.length < cfg.plankton) planktonArr.push(new Plankton());
+  planktonArr.length = cfg.plankton;
+}
+
+function initFish() {
+  while (fishArr.length < cfg.fish) fishArr.push(new DeepFish());
+  fishArr.length = cfg.fish;
+}
+
+initJellyfish();
+initPlankton();
+initFish();
+
+const particles = [];
+for (let i = 0; i < 80; i++) {
+  particles.push({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    size: Math.random() * 2 + 0.5,
+    speed: Math.random() * 0.2 + 0.05,
+    alpha: Math.random() * 0.15 + 0.05,
+    phase: Math.random() * Math.PI * 2
+  });
+}
+
+function drawBackground(t) {
+  const depthFactor = cfg.depth / 100;
+  const r = Math.floor(2 - depthFactor * 2);
+  const g = Math.floor(8 + (1 - depthFactor) * 20);
+  const b = Math.floor(20 + (1 - depthFactor) * 30);
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(0, 0, W, H);
+
+  const beamCount = 3 + Math.floor((1 - depthFactor) * 5);
+  for (let i = 0; i < beamCount; i++) {
+    const bx = (W / (beamCount + 1)) * (i + 1) + Math.sin(t * 0.2 + i) * 80;
+    ctx.save();
+    ctx.globalAlpha = (0.03 + (1 - depthFactor) * 0.04) * (cfg.glow / 100);
+    ctx.beginPath();
+    ctx.moveTo(bx - 30, 0);
+    ctx.lineTo(bx + 30, 0);
+    ctx.lineTo(bx + 150 + Math.sin(t * 0.3 + i) * 50, H);
+    ctx.lineTo(bx - 150 + Math.sin(t * 0.3 + i) * 50, H);
+    ctx.closePath();
+    const beamGrad = ctx.createLinearGradient(bx, 0, bx, H);
+    beamGrad.addColorStop(0, `hsla(200,60%,70%,0.5)`);
+    beamGrad.addColorStop(0.4, `hsla(210,50%,50%,0.2)`);
+    beamGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = beamGrad;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  particles.forEach(p => {
+    p.y -= p.speed;
+    p.x += Math.sin(t + p.phase) * 0.1;
+    if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(150,200,255,${p.alpha * (cfg.glow / 100)})`;
+    ctx.fill();
+  });
+}
+
+function drawMouseGlow(t) {
+  if (!mouse.active) return;
+  const glowStr = cfg.glow / 100;
+  const pulse = Math.sin(t * 3) * 0.2 + 0.8;
+
+  const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 120);
+  mg.addColorStop(0, `hsla(200,80%,70%,${0.08 * glowStr * pulse})`);
+  mg.addColorStop(0.5, `hsla(220,70%,50%,${0.03 * glowStr * pulse})`);
+  mg.addColorStop(1, 'transparent');
+  ctx.fillStyle = mg;
+  ctx.beginPath();
+  ctx.arc(mouse.x, mouse.y, 120, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawShockwaves() {
+  shockwaves.forEach(sw => {
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, sw.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(200,80%,70%,${sw.opacity * 0.4 * (cfg.glow / 100)})`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    const swGlow = ctx.createRadialGradient(sw.x, sw.y, Math.max(0, sw.r - 20), sw.x, sw.y, sw.r + 20);
+    swGlow.addColorStop(0, 'transparent');
+    swGlow.addColorStop(0.5, `hsla(200,80%,70%,${sw.opacity * 0.1 * (cfg.glow / 100)})`);
+    swGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = swGlow;
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, sw.r + 20, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawCaustics(t) {
+  const depthFactor = cfg.depth / 100;
+  if (depthFactor > 0.7) return;
+  ctx.save();
+  ctx.globalAlpha = (0.03 * (1 - depthFactor)) * (cfg.glow / 100);
+  for (let i = 0; i < 6; i++) {
+    const cx = W * 0.5 + Math.sin(t * 0.15 + i * 1.2) * W * 0.4;
+    const cy = H * 0.3 + Math.cos(t * 0.12 + i * 0.8) * H * 0.2;
+    const cr = 100 + Math.sin(t * 0.3 + i) * 40;
+    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+    cg.addColorStop(0, `hsla(180,60%,70%,0.5)`);
+    cg.addColorStop(1, 'transparent');
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+let lastTime = 0;
+function animate(now) {
+  const t = now * 0.001;
+  const dt = Math.min(0.05, (now - lastTime) * 0.001);
+  lastTime = now;
+
+  drawBackground(t);
+  drawCaustics(t);
+
+  planktonArr.forEach(p => { p.update(t); p.draw(t); });
+  fishArr.forEach(f => { f.update(t); f.draw(t); });
+  jellyfish.forEach(j => { j.update(t, dt); j.draw(t); });
+
+  drawMouseGlow(t);
+  drawShockwaves();
+
+  shockwaves.forEach(sw => {
+    sw.r += 4;
+    sw.opacity -= 0.012;
+  });
+  shockwaves = shockwaves.filter(sw => sw.opacity > 0);
+
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

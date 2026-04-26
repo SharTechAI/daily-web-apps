@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lava Lamp Simulator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a0f;
+  color: #e0e0e8;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+.lamp-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+canvas {
+  display: block;
+}
+
+.controls {
+  width: 280px;
+  background: #13131a;
+  border-left: 1px solid #1e1e2a;
+  padding: 24px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.controls h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #b0b0c0;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.control-row label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #9090a0;
+}
+
+.control-row label span {
+  color: #c0c0d0;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #1e1e2e;
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #7c6ff7;
+  cursor: pointer;
+  border: 2px solid #0a0a0f;
+}
+
+.presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.preset-btn {
+  padding: 8px 10px;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  background: #1a1a24;
+  color: #c0c0d0;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.preset-btn:hover {
+  background: #22222e;
+  border-color: #3a3a4e;
+}
+
+.preset-btn.active {
+  border-color: #7c6ff7;
+  background: #1e1a30;
+  color: #b0a8f8;
+}
+
+.color-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.swatch:hover {
+  transform: scale(1.1);
+}
+
+.swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255,255,255,0.3);
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #9090a0;
+}
+
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: #1e1e2e;
+  border-radius: 11px;
+  transition: background 0.3s;
+}
+
+.toggle input:checked + .toggle-track {
+  background: #7c6ff7;
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e0e0e8;
+  transition: transform 0.3s;
+}
+
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(18px);
+}
+
+.back-link {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  color: #666;
+  text-decoration: none;
+  font-size: 0.85rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+
+.back-link:hover { color: #aaa; }
+
+.title-area {
+  text-align: center;
+}
+
+.title-area h1 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ff6b4a, #ff9a3c, #ffcc33);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.title-area p {
+  font-size: 0.72rem;
+  color: #606070;
+  margin-top: 2px;
+}
+
+@media (max-width: 700px) {
+  body { flex-direction: column; }
+  .controls {
+    width: 100%;
+    max-height: 40vh;
+    border-left: none;
+    border-top: 1px solid #1e1e2a;
+  }
+}
+</style>
+</head>
+<body>
+
+<a class="back-link" href="../index.html">← Gallery</a>
+
+<div class="lamp-container">
+  <canvas id="lamp"></canvas>
+</div>
+
+<div class="controls">
+  <div class="title-area">
+    <h1>Lava Lamp</h1>
+    <p>Mesmerizing metaball simulation</p>
+  </div>
+
+  <div class="control-group">
+    <h2>Presets</h2>
+    <div class="presets">
+      <button class="preset-btn active" data-preset="classic">🔴 Classic</button>
+      <button class="preset-btn" data-preset="ocean">🔵 Ocean</button>
+      <button class="preset-btn" data-preset="aurora">🟢 Aurora</button>
+      <button class="preset-btn" data-preset="sunset">🟠 Sunset</button>
+      <button class="preset-btn" data-preset="cosmic">🟣 Cosmic</button>
+      <button class="preset-btn" data-preset="candy">🩷 Candy</button>
+      <button class="preset-btn" data-preset="neon">💛 Neon</button>
+      <button class="preset-btn" data-preset="midnight">🌙 Midnight</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Physics</h2>
+    <div class="control-row">
+      <label>Heat <span id="heat-val">50</span></label>
+      <input type="range" id="heat" min="10" max="100" value="50">
+    </div>
+    <div class="control-row">
+      <label>Viscosity <span id="viscosity-val">50</span></label>
+      <input type="range" id="viscosity" min="10" max="100" value="50">
+    </div>
+    <div class="control-row">
+      <label>Blob Count <span id="blobs-val">8</span></label>
+      <input type="range" id="blobs" min="3" max="20" value="8">
+    </div>
+    <div class="control-row">
+      <label>Blob Size <span id="size-val">50</span></label>
+      <input type="range" id="size" min="20" max="100" value="50">
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Appearance</h2>
+    <div class="control-row">
+      <label>Glow Intensity <span id="glow-val">60</span></label>
+      <input type="range" id="glow" min="0" max="100" value="60">
+    </div>
+    <div class="control-row">
+      <label>Speed <span id="speed-val">50</span></label>
+      <input type="range" id="speed" min="10" max="100" value="50">
+    </div>
+    <div class="toggle-row">
+      Ambient Light
+      <label class="toggle">
+        <input type="checkbox" id="ambient" checked>
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+    <div class="toggle-row">
+      Lamp Body
+      <label class="toggle">
+        <input type="checkbox" id="lampBody" checked>
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('lamp');
+const ctx = canvas.getContext('2d');
+
+const presets = {
+  classic: {
+    colors: ['#ff2200', '#ff5500', '#ff8800', '#ffaa00'],
+    waxBase: [255, 40, 0],
+    liquidColor: '#180808',
+    lampColor: '#2a1a0a',
+    capColor: '#c0a060',
+  },
+  ocean: {
+    colors: ['#0066ff', '#0099ff', '#00ccff', '#00eeff'],
+    waxBase: [0, 100, 255],
+    liquidColor: '#060818',
+    lampColor: '#0a1428',
+    capColor: '#4080a0',
+  },
+  aurora: {
+    colors: ['#00ff88', '#00ffaa', '#22ffcc', '#88ffaa'],
+    waxBase: [0, 255, 136],
+    liquidColor: '#061808',
+    lampColor: '#0a280a',
+    capColor: '#40a060',
+  },
+  sunset: {
+    colors: ['#ff4400', '#ff6600', '#ff8800', '#ffbb00'],
+    waxBase: [255, 80, 0],
+    liquidColor: '#181006',
+    lampColor: '#281a08',
+    capColor: '#c08040',
+  },
+  cosmic: {
+    colors: ['#8800ff', '#aa22ff', '#cc44ff', '#dd66ff'],
+    waxBase: [140, 0, 255],
+    liquidColor: '#100818',
+    lampColor: '#1a0a28',
+    capColor: '#8060a0',
+  },
+  candy: {
+    colors: ['#ff44aa', '#ff66cc', '#ff88dd', '#ffaaee'],
+    waxBase: [255, 68, 170],
+    liquidColor: '#180812',
+    lampColor: '#280a1a',
+    capColor: '#c060a0',
+  },
+  neon: {
+    colors: ['#ccff00', '#aaff00', '#88ff22', '#ffee00'],
+    waxBase: [200, 255, 0],
+    liquidColor: '#121806',
+    lampColor: '#1a2808',
+    capColor: '#a0c040',
+  },
+  midnight: {
+    colors: ['#2244aa', '#3355bb', '#4466cc', '#1133aa'],
+    waxBase: [34, 68, 170],
+    liquidColor: '#04060e',
+    lampColor: '#080c1e',
+    capColor: '#3050a0',
+  },
+};
+
+let currentPreset = 'classic';
+let config = {
+  heat: 50,
+  viscosity: 50,
+  blobCount: 8,
+  blobSize: 50,
+  glow: 60,
+  speed: 50,
+  ambient: true,
+  lampBody: true,
+};
+
+let blobs = [];
+let lampW, lampH, lampX, lampY, lampRadiusTop, lampRadiusBottom, lampRadiusMid;
+let offscreen, offCtx;
+
+function resize() {
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  computeLampDimensions();
+  offscreen = document.createElement('canvas');
+  offscreen.width = canvas.width;
+  offscreen.height = canvas.height;
+  offCtx = offscreen.getContext('2d');
+}
+
+function computeLampDimensions() {
+  const w = canvas.width;
+  const h = canvas.height;
+  lampH = Math.min(h * 0.82, 700);
+  lampW = Math.min(lampH * 0.32, w * 0.5);
+  lampX = w / 2;
+  lampY = h / 2;
+  lampRadiusTop = lampW * 0.28;
+  lampRadiusBottom = lampW * 0.38;
+  lampRadiusMid = lampW * 0.5;
+}
+
+function getLampRadius(y) {
+  const top = lampY - lampH / 2;
+  const bottom = lampY + lampH / 2;
+  const t = (y - top) / (bottom - top);
+
+  if (t < 0 || t > 1) return 0;
+
+  const capZone = 0.06;
+  const neckZone = 0.15;
+  const bulgeStart = 0.25;
+  const bulgePeak = 0.55;
+  const taperStart = 0.8;
+
+  if (t < capZone) {
+    const lt = t / capZone;
+    return lampRadiusTop * (0.7 + 0.3 * Math.sin(lt * Math.PI / 2));
+  } else if (t < neckZone) {
+    const lt = (t - capZone) / (neckZone - capZone);
+    return lampRadiusTop + (lampRadiusTop * 0.05) * Math.sin(lt * Math.PI);
+  } else if (t < bulgeStart) {
+    const lt = (t - neckZone) / (bulgeStart - neckZone);
+    return lampRadiusTop + (lampRadiusMid - lampRadiusTop) * (lt * lt);
+  } else if (t < bulgePeak) {
+    const lt = (t - bulgeStart) / (bulgePeak - bulgeStart);
+    const ease = Math.sin(lt * Math.PI / 2);
+    return lampRadiusMid + (lampRadiusMid * 0.05) * Math.sin(ease * Math.PI);
+  } else if (t < taperStart) {
+    const lt = (t - bulgePeak) / (taperStart - bulgePeak);
+    return lampRadiusMid * (1 - 0.05 * lt);
+  } else {
+    const lt = (t - taperStart) / (1 - taperStart);
+    const r = lampRadiusMid * 0.95;
+    return r + (lampRadiusBottom - r) * lt;
+  }
+}
+
+function initBlobs() {
+  blobs = [];
+  const top = lampY - lampH / 2;
+  const bottom = lampY + lampH / 2;
+  const usableTop = top + lampH * 0.15;
+  const usableBottom = bottom - lampH * 0.08;
+
+  for (let i = 0; i < config.blobCount; i++) {
+    const y = usableTop + Math.random() * (usableBottom - usableTop);
+    const r = getLampRadius(y);
+    blobs.push({
+      x: lampX + (Math.random() - 0.5) * r * 0.6,
+      y: y,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.5,
+      radius: (20 + Math.random() * 30) * (config.blobSize / 50),
+      phase: Math.random() * Math.PI * 2,
+      colorIdx: i % presets[currentPreset].colors.length,
+    });
+  }
+}
+
+function updateBlobs(dt) {
+  const top = lampY - lampH / 2 + lampH * 0.12;
+  const bottom = lampY + lampH / 2 - lampH * 0.06;
+  const heatCenter = bottom;
+  const heatFactor = config.heat / 50;
+  const viscFactor = config.viscosity / 50;
+  const speedFactor = config.speed / 50;
+
+  for (const b of blobs) {
+    b.phase += dt * 0.5 * speedFactor;
+
+    const distFromHeat = (heatCenter - b.y) / (bottom - top);
+    const buoyancy = (0.3 + 0.7 * (1 - distFromHeat)) * heatFactor;
+    const rise = distFromHeat < 0.3 ? buoyancy * 25 : -8 * (1 - distFromHeat);
+
+    b.vy += rise * dt * speedFactor;
+    b.vx += Math.sin(b.phase * 1.3) * 3 * dt * speedFactor;
+    b.vy += Math.cos(b.phase * 0.7) * 2 * dt * speedFactor;
+
+    const drag = 0.02 + 0.06 * viscFactor;
+    b.vx *= (1 - drag);
+    b.vy *= (1 - drag);
+
+    b.x += b.vx * dt * 60;
+    b.y += b.vy * dt * 60;
+
+    const r = getLampRadius(b.y) - b.radius * 0.5;
+    const dx = b.x - lampX;
+    if (Math.abs(dx) > r && r > 0) {
+      b.x = lampX + Math.sign(dx) * r;
+      b.vx *= -0.3;
+    }
+
+    if (b.y < top + b.radius) {
+      b.y = top + b.radius;
+      b.vy *= -0.2;
+      b.vy += 0.5;
+    }
+    if (b.y > bottom - b.radius) {
+      b.y = bottom - b.radius;
+      b.vy *= -0.4;
+      b.vy -= 1.5 * heatFactor;
+    }
+
+    b.radius += Math.sin(b.phase * 2) * 0.02;
+    const baseSize = (20 + 30 * ((b.colorIdx % 4) / 3)) * (config.blobSize / 50);
+    b.radius += (baseSize - b.radius) * 0.01;
+  }
+
+  for (let i = 0; i < blobs.length; i++) {
+    for (let j = i + 1; j < blobs.length; j++) {
+      const a = blobs[i], b = blobs[j];
+      const ddx = a.x - b.x, ddy = a.y - b.y;
+      const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      const minDist = (a.radius + b.radius) * 0.6;
+      if (dist < minDist && dist > 0) {
+        const overlap = (minDist - dist) / dist * 0.3;
+        a.x += ddx * overlap;
+        a.y += ddy * overlap;
+        b.x -= ddx * overlap;
+        b.y -= ddy * overlap;
+      }
+    }
+  }
+}
+
+function drawLampBody() {
+  if (!config.lampBody) return;
+
+  const preset = presets[currentPreset];
+  const top = lampY - lampH / 2;
+  const bottom = lampY + lampH / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  for (let y = top; y <= bottom; y += 1) {
+    const r = getLampRadius(y);
+    if (y === top) ctx.moveTo(lampX + r, y);
+    else ctx.lineTo(lampX + r, y);
+  }
+  for (let y = bottom; y >= top; y -= 1) {
+    const r = getLampRadius(y);
+    ctx.lineTo(lampX - r, y);
+  }
+  ctx.closePath();
+
+  const bodyGrad = ctx.createLinearGradient(lampX - lampRadiusMid, 0, lampX + lampRadiusMid, 0);
+  bodyGrad.addColorStop(0, 'rgba(255,255,255,0.04)');
+  bodyGrad.addColorStop(0.3, 'rgba(255,255,255,0.01)');
+  bodyGrad.addColorStop(0.7, 'rgba(255,255,255,0.01)');
+  bodyGrad.addColorStop(1, 'rgba(255,255,255,0.04)');
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  const capH = lampH * 0.06;
+  const capTop = top;
+  const capBot = top + capH;
+
+  ctx.beginPath();
+  for (let y = capTop; y <= capBot; y += 1) {
+    const r = getLampRadius(y);
+    if (y === capTop) ctx.moveTo(lampX + r, y);
+    else ctx.lineTo(lampX + r, y);
+  }
+  for (let y = capBot; y >= capTop; y -= 1) {
+    const r = getLampRadius(y);
+    ctx.lineTo(lampX - r, y);
+  }
+  ctx.closePath();
+
+  const capGrad = ctx.createLinearGradient(0, capTop, 0, capBot);
+  capGrad.addColorStop(0, preset.capColor);
+  capGrad.addColorStop(0.5, preset.capColor + '80');
+  capGrad.addColorStop(1, preset.capColor + '40');
+  ctx.fillStyle = capGrad;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  const baseStart = bottom - lampH * 0.08;
+  ctx.beginPath();
+  for (let y = baseStart; y <= bottom; y += 1) {
+    const r = getLampRadius(y);
+    if (y === baseStart) ctx.moveTo(lampX + r, y);
+    else ctx.lineTo(lampX + r, y);
+  }
+  for (let y = bottom; y >= baseStart; y -= 1) {
+    const r = getLampRadius(y);
+    ctx.lineTo(lampX - r, y);
+  }
+  ctx.closePath();
+
+  const baseGrad = ctx.createLinearGradient(0, baseStart, 0, bottom);
+  baseGrad.addColorStop(0, preset.capColor + '40');
+  baseGrad.addColorStop(0.5, preset.capColor + '80');
+  baseGrad.addColorStop(1, preset.capColor);
+  ctx.fillStyle = baseGrad;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMetaballs() {
+  const preset = presets[currentPreset];
+  const top = lampY - lampH / 2;
+  const bottom = lampY + lampH / 2;
+  const usableTop = top + lampH * 0.07;
+  const usableBottom = bottom - lampH * 0.07;
+
+  offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+
+  offCtx.save();
+  offCtx.beginPath();
+  for (let y = usableTop; y <= usableBottom; y += 1) {
+    const r = getLampRadius(y) - 3;
+    if (r <= 0) continue;
+    if (y === usableTop) offCtx.moveTo(lampX + r, y);
+    else offCtx.lineTo(lampX + r, y);
+  }
+  for (let y = usableBottom; y >= usableTop; y -= 1) {
+    const r = getLampRadius(y) - 3;
+    if (r <= 0) continue;
+    offCtx.lineTo(lampX - r, y);
+  }
+  offCtx.closePath();
+  offCtx.clip();
+
+  offCtx.fillStyle = preset.liquidColor;
+  offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+
+  const glowFactor = config.glow / 100;
+
+  for (const b of blobs) {
+    const color = preset.colors[b.colorIdx];
+    const r = b.radius * 2.5;
+
+    const grad = offCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r);
+    grad.addColorStop(0, color + 'ff');
+    grad.addColorStop(0.3, color + 'cc');
+    grad.addColorStop(0.6, color + '66');
+    grad.addColorStop(1, color + '00');
+
+    offCtx.globalCompositeOperation = 'lighter';
+    offCtx.fillStyle = grad;
+    offCtx.beginPath();
+    offCtx.arc(b.x, b.y, r, 0, Math.PI * 2);
+    offCtx.fill();
+  }
+
+  offCtx.globalCompositeOperation = 'source-over';
+
+  const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+  const data = imgData.data;
+  const threshold = 100;
+  const softEdge = 40;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const brightness = Math.max(data[i], data[i + 1], data[i + 2]);
+    if (brightness < threshold - softEdge) {
+      const liq = hexToRgb(preset.liquidColor);
+      data[i] = liq[0];
+      data[i + 1] = liq[1];
+      data[i + 2] = liq[2];
+      data[i + 3] = 255;
+    } else if (brightness < threshold) {
+      const t = (brightness - (threshold - softEdge)) / softEdge;
+      const liq = hexToRgb(preset.liquidColor);
+      const wb = preset.waxBase;
+      data[i] = Math.round(liq[0] + (wb[0] - liq[0]) * t);
+      data[i + 1] = Math.round(liq[1] + (wb[1] - liq[1]) * t);
+      data[i + 2] = Math.round(liq[2] + (wb[2] - liq[2]) * t);
+      data[i + 3] = 255;
+    } else {
+      const t = Math.min((brightness - threshold) / 155, 1);
+      const wb = preset.waxBase;
+      const boost = 1 + t * 0.5 * glowFactor;
+      data[i] = Math.min(255, Math.round(wb[0] * boost));
+      data[i + 1] = Math.min(255, Math.round(wb[1] * boost));
+      data[i + 2] = Math.min(255, Math.round(wb[2] * boost));
+      data[i + 3] = 255;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  offCtx.restore();
+
+  ctx.drawImage(offscreen, 0, 0);
+}
+
+function drawAmbientGlow() {
+  if (!config.ambient) return;
+
+  const preset = presets[currentPreset];
+  const glowFactor = config.glow / 100;
+  const color = preset.waxBase;
+
+  const grad = ctx.createRadialGradient(lampX, lampY, lampRadiusMid * 0.5, lampX, lampY, lampRadiusMid * 3);
+  grad.addColorStop(0, `rgba(${color[0]},${color[1]},${color[2]},${0.06 * glowFactor})`);
+  grad.addColorStop(0.5, `rgba(${color[0]},${color[1]},${color[2]},${0.02 * glowFactor})`);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+
+function drawGlassHighlights() {
+  if (!config.lampBody) return;
+
+  const top = lampY - lampH / 2;
+  const bottom = lampY + lampH / 2;
+
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.beginPath();
+  for (let y = top + lampH * 0.1; y < bottom - lampH * 0.1; y += 1) {
+    const r = getLampRadius(y);
+    const x = lampX - r * 0.75;
+    if (y === top + lampH * 0.1) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  for (let y = bottom - lampH * 0.1; y > top + lampH * 0.1; y -= 1) {
+    const r = getLampRadius(y);
+    const x = lampX - r * 0.85;
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.restore();
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
+}
+
+let lastTime = 0;
+function animate(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawAmbientGlow();
+  drawMetaballs();
+  drawLampBody();
+  drawGlassHighlights();
+
+  updateBlobs(dt);
+  requestAnimationFrame(animate);
+}
+
+function bindControls() {
+  const sliders = ['heat', 'viscosity', 'speed', 'glow', 'size'];
+  const configKeys = ['heat', 'viscosity', 'speed', 'glow', 'blobSize'];
+
+  sliders.forEach((id, i) => {
+    const el = document.getElementById(id);
+    const valEl = document.getElementById(id + '-val');
+    el.addEventListener('input', () => {
+      config[configKeys[i]] = parseInt(el.value);
+      valEl.textContent = el.value;
+    });
+  });
+
+  const blobsEl = document.getElementById('blobs');
+  blobsEl.addEventListener('input', () => {
+    const val = parseInt(blobsEl.value);
+    document.getElementById('blobs-val').textContent = val;
+    if (val !== config.blobCount) {
+      config.blobCount = val;
+      initBlobs();
+    }
+  });
+
+  document.getElementById('ambient').addEventListener('change', (e) => {
+    config.ambient = e.target.checked;
+  });
+
+  document.getElementById('lampBody').addEventListener('change', (e) => {
+    config.lampBody = e.target.checked;
+  });
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentPreset = btn.dataset.preset;
+      initBlobs();
+    });
+  });
+}
+
+window.addEventListener('resize', () => {
+  resize();
+  initBlobs();
+});
+
+resize();
+initBlobs();
+bindControls();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
