@@ -78,6 +78,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "isometric-voxel-builder", "-l", "3468"],
       "port": 3468
+    },
+    {
+      "name": "marbling-studio",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "marbling-studio", "-l", "3469"],
+      "port": 3469
     }
   ]
 }
