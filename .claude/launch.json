@@ -60,6 +60,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "step-sequencer", "-l", "3465"],
       "port": 3465
+    },
+    {
+      "name": "logic-gate-simulator",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "logic-gate-simulator", "-l", "3466"],
+      "port": 3466
     }
   ]
 }

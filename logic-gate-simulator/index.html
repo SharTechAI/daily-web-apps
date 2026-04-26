@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logic Gate Simulator</title>
+<style>
+  :root {
+    --bg: #0d0e12;
+    --surface: #15161c;
+    --surface2: #1c1d26;
+    --border: #2a2b38;
+    --accent: #00c9a7;
+    --accent2: #845ef7;
+    --high: #00e676;
+    --low: #455a64;
+    --wire-high: #00e676;
+    --wire-low: #37474f;
+    --text: #e0e0e8;
+    --muted: #6b6c80;
+    --danger: #ff5252;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .toolbar button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .toolbar button:hover {
+    border-color: var(--accent);
+    background: rgba(0,201,167,0.08);
+  }
+
+  .toolbar button.active {
+    border-color: var(--accent);
+    background: rgba(0,201,167,0.15);
+    color: var(--accent);
+  }
+
+  .toolbar button.danger:hover {
+    border-color: var(--danger);
+    background: rgba(255,82,82,0.08);
+    color: var(--danger);
+  }
+
+  .main-area {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 180px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 12px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .sidebar-section {
+    margin-bottom: 16px;
+  }
+
+  .sidebar-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .gate-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: grab;
+    transition: all 0.15s;
+    margin-bottom: 4px;
+  }
+
+  .gate-btn:hover {
+    border-color: var(--accent);
+    background: rgba(0,201,167,0.08);
+  }
+
+  .gate-btn:active {
+    cursor: grabbing;
+  }
+
+  .gate-btn .gate-sym {
+    width: 24px;
+    height: 18px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-size: 0.7rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .preset-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .preset-btn:hover {
+    border-color: var(--accent2);
+    background: rgba(132,94,247,0.08);
+  }
+
+  .tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.7rem;
+    color: var(--text);
+    pointer-events: none;
+    z-index: 1000;
+    max-width: 200px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    display: none;
+  }
+
+  .context-menu {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    z-index: 1000;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+    display: none;
+    min-width: 140px;
+  }
+
+  .context-menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .context-menu button:hover {
+    background: rgba(0,201,167,0.1);
+  }
+
+  .context-menu button.danger {
+    color: var(--danger);
+  }
+
+  @media (max-width: 700px) {
+    .sidebar { width: 140px; }
+    .toolbar button span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <span>Logic Gate Sim</span>
+  </div>
+  <div class="toolbar">
+    <button id="btn-select" class="active" title="Select & Move (V)"><span>Select</span> V</button>
+    <button id="btn-wire" title="Draw Wire (W)"><span>Wire</span> W</button>
+    <button id="btn-delete" title="Delete (Del)"><span>Delete</span> ⌫</button>
+    <button id="btn-run" title="Toggle Simulation (Space)">▶ <span>Run</span></button>
+    <button id="btn-clear" class="danger" title="Clear All">✕ <span>Clear</span></button>
+  </div>
+</header>
+
+<div class="main-area">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Inputs / Outputs</div>
+      <button class="gate-btn" data-gate="SWITCH">
+        <div class="gate-sym" style="background:#1a3a2a;color:#00e676">0/1</div>
+        Switch
+      </button>
+      <button class="gate-btn" data-gate="CLOCK">
+        <div class="gate-sym" style="background:#1a2a3a;color:#42a5f5">CLK</div>
+        Clock
+      </button>
+      <button class="gate-btn" data-gate="LED">
+        <div class="gate-sym" style="background:#3a1a1a;color:#ff5252">LED</div>
+        LED
+      </button>
+      <button class="gate-btn" data-gate="7SEG">
+        <div class="gate-sym" style="background:#2a2a1a;color:#ffd740">7S</div>
+        7-Segment
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Basic Gates</div>
+      <button class="gate-btn" data-gate="AND">
+        <div class="gate-sym" style="background:#1a1a3a;color:#7c6ff7">&amp;</div>
+        AND
+      </button>
+      <button class="gate-btn" data-gate="OR">
+        <div class="gate-sym" style="background:#1a2a2a;color:#00c9a7">≥1</div>
+        OR
+      </button>
+      <button class="gate-btn" data-gate="NOT">
+        <div class="gate-sym" style="background:#2a1a2a;color:#e040fb">1</div>
+        NOT
+      </button>
+      <button class="gate-btn" data-gate="XOR">
+        <div class="gate-sym" style="background:#1a2a1a;color:#76ff03">=1</div>
+        XOR
+      </button>
+      <button class="gate-btn" data-gate="NAND">
+        <div class="gate-sym" style="background:#2a1a1a;color:#ff8a65">&amp;</div>
+        NAND
+      </button>
+      <button class="gate-btn" data-gate="NOR">
+        <div class="gate-sym" style="background:#1a1a2a;color:#64b5f6">≥1</div>
+        NOR
+      </button>
+      <button class="gate-btn" data-gate="XNOR">
+        <div class="gate-sym" style="background:#2a2a1a;color:#ffd54f">=1</div>
+        XNOR
+      </button>
+      <button class="gate-btn" data-gate="BUF">
+        <div class="gate-sym" style="background:#1a2a2a;color:#4dd0e1">→</div>
+        Buffer
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Presets</div>
+      <div class="preset-list">
+        <button class="preset-btn" data-preset="sr-latch">🔒 SR Latch</button>
+        <button class="preset-btn" data-preset="half-adder">➕ Half Adder</button>
+        <button class="preset-btn" data-preset="full-adder">➕ Full Adder</button>
+        <button class="preset-btn" data-preset="mux">🔀 2:1 Mux</button>
+        <button class="preset-btn" data-preset="counter">🔢 2-Bit Counter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="status-text">Ready — drag gates from sidebar to place</span>
+  <span id="status-info">Gates: 0 | Wires: 0</span>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="context-menu" id="context-menu">
+  <button id="ctx-toggle">Toggle Value</button>
+  <button id="ctx-label">Rename</button>
+  <button id="ctx-delete" class="danger">Delete</button>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+const tooltip = document.getElementById('tooltip');
+const contextMenu = document.getElementById('context-menu');
+
+let W, H, dpr;
+let gates = [];
+let wires = [];
+let nextId = 1;
+let mode = 'select';
+let running = true;
+let dragging = null;
+let dragOffX = 0, dragOffY = 0;
+let wireStart = null;
+let wirePreview = null;
+let selected = null;
+let hoveredPin = null;
+let panX = 0, panY = 0;
+let isPanning = false;
+let panStartX, panStartY, panOrigX, panOrigY;
+let clockTick = 0;
+
+const GATE_W = 80;
+const GATE_H = 50;
+const PIN_R = 6;
+const SEG7_W = 60;
+const SEG7_H = 80;
+
+const GATE_COLORS = {
+  AND: '#7c6ff7', OR: '#00c9a7', NOT: '#e040fb', XOR: '#76ff03',
+  NAND: '#ff8a65', NOR: '#64b5f6', XNOR: '#ffd54f', BUF: '#4dd0e1',
+  SWITCH: '#00e676', CLOCK: '#42a5f5', LED: '#ff5252', '7SEG': '#ffd740'
+};
+
+const GATE_SYMBOLS = {
+  AND: '&', OR: '≥1', NOT: '1', XOR: '=1',
+  NAND: '&', NOR: '≥1', XNOR: '=1', BUF: '→',
+  SWITCH: '', CLOCK: 'CLK', LED: '', '7SEG': ''
+};
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = wrap.clientWidth;
+  H = wrap.clientHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawGrid();
+}
+
+function gateWidth(g) { return g.type === '7SEG' ? SEG7_W : GATE_W; }
+function gateHeight(g) { return g.type === '7SEG' ? SEG7_H : GATE_H; }
+
+function inputCount(type) {
+  if (type === 'NOT' || type === 'BUF' || type === 'LED') return 1;
+  if (type === 'SWITCH' || type === 'CLOCK') return 0;
+  if (type === '7SEG') return 4;
+  return 2;
+}
+
+function outputCount(type) {
+  if (type === 'LED' || type === '7SEG') return 0;
+  return 1;
+}
+
+function getPins(g) {
+  const pins = [];
+  const gw = gateWidth(g);
+  const gh = gateHeight(g);
+  const ic = inputCount(g.type);
+  const oc = outputCount(g.type);
+  for (let i = 0; i < ic; i++) {
+    const y = gh / (ic + 1) * (i + 1);
+    pins.push({ x: g.x + panX, y: g.y + panY + y, type: 'input', index: i, gate: g });
+  }
+  for (let i = 0; i < oc; i++) {
+    const y = gh / (oc + 1) * (i + 1);
+    pins.push({ x: g.x + panX + gw, y: g.y + panY + y, type: 'output', index: i, gate: g });
+  }
+  return pins;
+}
+
+function findPin(mx, my, excludeGate) {
+  let best = null, bestDist = PIN_R * 2.5;
+  for (const g of gates) {
+    if (g === excludeGate) continue;
+    for (const p of getPins(g)) {
+      const d = Math.hypot(p.x - mx, p.y - my);
+      if (d < bestDist) { best = p; bestDist = d; }
+    }
+  }
+  return best;
+}
+
+function findGate(mx, my) {
+  for (let i = gates.length - 1; i >= 0; i--) {
+    const g = gates[i];
+    const gw = gateWidth(g);
+    const gh = gateHeight(g);
+    if (mx >= g.x + panX && mx <= g.x + panX + gw && my >= g.y + panY && my <= g.y + panY + gh) return g;
+  }
+  return null;
+}
+
+function createGate(type, x, y) {
+  const g = {
+    id: nextId++,
+    type,
+    x: x - panX,
+    y: y - panY,
+    inputs: new Array(inputCount(type)).fill(false),
+    outputs: new Array(outputCount(type)).fill(false),
+    value: false,
+    label: type,
+    clockSpeed: 30,
+    clockCounter: 0
+  };
+  gates.push(g);
+  return g;
+}
+
+function addWire(fromGate, fromIndex, toGate, toIndex) {
+  const existing = wires.find(w => w.toGate === toGate.id && w.toIndex === toIndex);
+  if (existing) return;
+  if (fromGate.id === toGate.id) return;
+  wires.push({
+    fromGate: fromGate.id,
+    fromIndex,
+    toGate: toGate.id,
+    toIndex,
+    value: false
+  });
+}
+
+function deleteGate(g) {
+  wires = wires.filter(w => w.fromGate !== g.id && w.toGate !== g.id);
+  gates = gates.filter(gate => gate !== g);
+  if (selected === g) selected = null;
+}
+
+function deleteWire(w) {
+  wires = wires.filter(wire => wire !== w);
+}
+
+function evaluate(g) {
+  if (g.type === 'SWITCH') {
+    g.outputs[0] = g.value;
+    return;
+  }
+  if (g.type === 'CLOCK') {
+    g.clockCounter++;
+    if (g.clockCounter >= g.clockSpeed) {
+      g.value = !g.value;
+      g.clockCounter = 0;
+    }
+    g.outputs[0] = g.value;
+    return;
+  }
+  const a = g.inputs[0] || false;
+  const b = g.inputs[1] || false;
+  switch (g.type) {
+    case 'AND': g.outputs[0] = a && b; break;
+    case 'OR': g.outputs[0] = a || b; break;
+    case 'NOT': g.outputs[0] = !a; break;
+    case 'XOR': g.outputs[0] = a !== b; break;
+    case 'NAND': g.outputs[0] = !(a && b); break;
+    case 'NOR': g.outputs[0] = !(a || b); break;
+    case 'XNOR': g.outputs[0] = a === b; break;
+    case 'BUF': g.outputs[0] = a; break;
+    case 'LED': g.value = a; break;
+    case '7SEG': {
+      let val = 0;
+      for (let i = 0; i < 4; i++) {
+        if (g.inputs[i]) val |= (1 << i);
+      }
+      g.value = val;
+      break;
+    }
+  }
+}
+
+function simulate() {
+  if (!running) return;
+  for (const g of gates) {
+    if (g.type !== 'SWITCH' && g.type !== 'CLOCK') {
+      g.inputs.fill(false);
+    }
+  }
+  for (const w of wires) {
+    const from = gates.find(g => g.id === w.fromGate);
+    const to = gates.find(g => g.id === w.toGate);
+    if (from && to) {
+      w.value = from.outputs[w.fromIndex] || false;
+      to.inputs[w.toIndex] = to.inputs[w.toIndex] || w.value;
+    }
+  }
+  for (const g of gates) evaluate(g);
+}
+
+function drawGrid() {
+  ctx.fillStyle = '#0d0e12';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#1a1b24';
+  ctx.lineWidth = 0.5;
+  const gs = 20;
+  const offX = panX % gs;
+  const offY = panY % gs;
+  for (let x = offX; x < W; x += gs) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = offY; y < H; y += gs) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+}
+
+function drawWire(w) {
+  const from = gates.find(g => g.id === w.fromGate);
+  const to = gates.find(g => g.id === w.toGate);
+  if (!from || !to) return;
+
+  const fromPins = getPins(from);
+  const toPins = getPins(to);
+  const fp = fromPins.find(p => p.type === 'output' && p.index === w.fromIndex);
+  const tp = toPins.find(p => p.type === 'input' && p.index === w.toIndex);
+  if (!fp || !tp) return;
+
+  const val = w.value;
+  ctx.strokeStyle = val ? 'rgba(0,230,118,0.9)' : 'rgba(55,71,79,0.7)';
+  ctx.lineWidth = val ? 2.5 : 1.5;
+  ctx.lineCap = 'round';
+
+  if (val) {
+    ctx.shadowColor = '#00e676';
+    ctx.shadowBlur = 6;
+  }
+
+  const midX = (fp.x + tp.x) / 2;
+  ctx.beginPath();
+  ctx.moveTo(fp.x, fp.y);
+  ctx.bezierCurveTo(midX, fp.y, midX, tp.y, tp.x, tp.y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function draw7Seg(g) {
+  const x = g.x + panX;
+  const y = g.y + panY;
+  const w = SEG7_W;
+  const h = SEG7_H;
+
+  ctx.fillStyle = selected === g ? '#1e1f2e' : '#141520';
+  ctx.strokeStyle = selected === g ? var_accent() : '#2a2b38';
+  ctx.lineWidth = selected === g ? 2 : 1;
+  roundRect(x, y, w, h, 8);
+
+  const segs = [
+    [0b0000001, 0b0100001, 0b0010010, 0b0000110, 0b0100100, 0b0001100, 0b0011100, 0b0000011,
+     0b0011110, 0b0101110][g.value] || 0,
+  ];
+
+  const SEGMENTS = {
+    0: 0x7E, 1: 0x30, 2: 0x6D, 3: 0x79, 4: 0x33,
+    5: 0x5B, 6: 0x5F, 7: 0x70, 8: 0x7F, 9: 0x7B,
+    10: 0x77, 11: 0x1F, 12: 0x4E, 13: 0x3D, 14: 0x4F, 15: 0x47
+  };
+
+  const sv = SEGMENTS[g.value % 16] || 0;
+  const sx = x + 14, sy = y + 10;
+  const sw = 32, sh = 52;
+  const t = 4;
+
+  const segPaths = [
+    [[sx+t, sy], [sx+sw-t, sy], [sx+sw-t+2, sy+t], [sx+t-2, sy+t]],
+    [[sx+sw, sy+t], [sx+sw+2, sy+sh/2-t], [sx+sw, sy+sh/2], [sx+sw-t, sy+sh/2-2], [sx+sw-t, sy+t+2]],
+    [[sx+sw, sy+sh/2], [sx+sw+2, sy+sh-t], [sx+sw, sy+sh], [sx+sw-t, sy+sh-t-2], [sx+sw-t, sy+sh/2+2]],
+    [[sx+t, sy+sh], [sx+sw-t, sy+sh], [sx+sw-t+2, sy+sh-t], [sx+t-2, sy+sh-t]],
+    [[sx, sy+sh/2], [sx+2, sy+sh-t], [sx, sy+sh], [sx-t+4, sy+sh-t-2], [sx-t+4, sy+sh/2+2]],
+    [[sx, sy+t], [sx+2, sy+sh/2-t], [sx, sy+sh/2], [sx-t+4, sy+sh/2-2], [sx-t+4, sy+t+2]],
+    [[sx+t, sy+sh/2-t/2], [sx+sw-t, sy+sh/2-t/2], [sx+sw-t+2, sy+sh/2+t/2], [sx+t-2, sy+sh/2+t/2]],
+  ];
+
+  const bits = [0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01];
+  for (let i = 0; i < 7; i++) {
+    const on = (sv & bits[i]) !== 0;
+    ctx.fillStyle = on ? '#ff1744' : '#1a1a2a';
+    if (on) { ctx.shadowColor = '#ff1744'; ctx.shadowBlur = 8; }
+    ctx.beginPath();
+    const pts = segPaths[i];
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0], pts[j][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = '#6b6c80';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(g.value.toString(16).toUpperCase(), x + w / 2, y + h - 4);
+
+  const ic = inputCount(g.type);
+  for (let i = 0; i < ic; i++) {
+    const py = h / (ic + 1) * (i + 1);
+    const on = g.inputs[i];
+    ctx.fillStyle = on ? var_high() : '#2a2b38';
+    ctx.beginPath();
+    ctx.arc(x, y + py, PIN_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#6b6c80';
+    ctx.font = '7px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('D' + i, x + 8, y + py + 3);
+  }
+}
+
+function var_accent() { return '#00c9a7'; }
+function var_high() { return '#00e676'; }
+
+function drawGate(g) {
+  if (g.type === '7SEG') { draw7Seg(g); return; }
+
+  const x = g.x + panX;
+  const y = g.y + panY;
+  const w = GATE_W;
+  const h = GATE_H;
+  const color = GATE_COLORS[g.type];
+  const isSelected = selected === g;
+
+  ctx.fillStyle = isSelected ? '#1e1f2e' : '#141520';
+  ctx.strokeStyle = isSelected ? var_accent() : '#2a2b38';
+  ctx.lineWidth = isSelected ? 2 : 1;
+  roundRect(x, y, w, h, 8);
+
+  if (g.type === 'SWITCH') {
+    const on = g.value;
+    ctx.fillStyle = on ? 'rgba(0,230,118,0.2)' : 'rgba(55,71,79,0.2)';
+    roundRectFill(x + 8, y + 8, w - 16, h - 16, 6);
+    ctx.fillStyle = on ? '#00e676' : '#455a64';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(on ? '1' : '0', x + w / 2, y + h / 2);
+    if (on) { ctx.shadowColor = '#00e676'; ctx.shadowBlur = 10; }
+    ctx.fillStyle = on ? '#00e676' : '#455a64';
+    ctx.beginPath();
+    ctx.arc(x + w, y + h / 2, PIN_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    if (g.label !== g.type) {
+      ctx.fillStyle = '#6b6c80';
+      ctx.font = '8px monospace';
+      ctx.fillText(g.label, x + w / 2, y - 4);
+    }
+    return;
+  }
+
+  if (g.type === 'CLOCK') {
+    const on = g.value;
+    ctx.fillStyle = 'rgba(66,165,245,0.15)';
+    roundRectFill(x + 8, y + 8, w - 16, h - 16, 6);
+    ctx.strokeStyle = '#42a5f5';
+    ctx.lineWidth = 1.5;
+    const cx2 = x + w / 2;
+    const cy2 = y + h / 2;
+    ctx.beginPath();
+    for (let i = 0; i < 20; i++) {
+      const px = x + 14 + (w - 28) * i / 19;
+      const v = (i + (on ? 10 : 0)) % 8 < 4 ? -8 : 8;
+      if (i === 0) ctx.moveTo(px, cy2 + v);
+      else ctx.lineTo(px, cy2 + v);
+    }
+    ctx.stroke();
+    ctx.fillStyle = on ? '#42a5f5' : '#37474f';
+    if (on) { ctx.shadowColor = '#42a5f5'; ctx.shadowBlur = 8; }
+    ctx.beginPath();
+    ctx.arc(x + w, y + h / 2, PIN_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = isSelected ? var_accent() : '#2a2b38';
+    return;
+  }
+
+  if (g.type === 'LED') {
+    const on = g.value;
+    const ledColor = on ? '#ff1744' : '#2a2b38';
+    ctx.fillStyle = on ? 'rgba(255,23,68,0.15)' : 'rgba(42,43,56,0.15)';
+    roundRectFill(x + 8, y + 8, w - 16, h - 16, 6);
+    if (on) { ctx.shadowColor = '#ff1744'; ctx.shadowBlur = 15; }
+    ctx.fillStyle = ledColor;
+    ctx.beginPath();
+    ctx.arc(x + w / 2, y + h / 2, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = on ? '#455a64' : '#2a2b38';
+    ctx.beginPath();
+    ctx.arc(x, y + h / 2, PIN_R, 0, Math.PI * 2);
+    ctx.fill();
+    if (g.label !== g.type) {
+      ctx.fillStyle = '#6b6c80';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(g.label, x + w / 2, y - 4);
+    }
+    return;
+  }
+
+  ctx.fillStyle = color + '18';
+  roundRectFill(x + 3, y + 3, w - 6, h - 6, 6);
+
+  const negated = ['NOT', 'NAND', 'NOR', 'XNOR'].includes(g.type);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(GATE_SYMBOLS[g.type], x + w / 2, y + h / 2);
+
+  if (negated && g.type !== 'NOT') {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x + w + 1, y + h / 2, 4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#6b6c80';
+  ctx.font = '8px monospace';
+  ctx.fillText(g.type, x + w / 2, y + h + 10);
+
+  const ic = inputCount(g.type);
+  const oc = outputCount(g.type);
+  for (let i = 0; i < ic; i++) {
+    const py = h / (ic + 1) * (i + 1);
+    const on = g.inputs[i];
+    ctx.fillStyle = on ? var_high() : '#2a2b38';
+    if (on) { ctx.shadowColor = '#00e676'; ctx.shadowBlur = 4; }
+    ctx.beginPath();
+    ctx.arc(x, y + py, PIN_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  for (let i = 0; i < oc; i++) {
+    const py = h / (oc + 1) * (i + 1);
+    const on = g.outputs[i];
+    ctx.fillStyle = on ? var_high() : '#2a2b38';
+    if (on) { ctx.shadowColor = '#00e676'; ctx.shadowBlur = 4; }
+    ctx.beginPath();
+    ctx.arc(x + w, y + py, PIN_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+  ctx.stroke();
+}
+
+function roundRectFill(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+}
+
+function render() {
+  simulate();
+  drawGrid();
+  for (const w of wires) drawWire(w);
+  for (const g of gates) drawGate(g);
+
+  if (wireStart && wirePreview) {
+    ctx.strokeStyle = 'rgba(0,201,167,0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    const midX = (wireStart.x + wirePreview.x) / 2;
+    ctx.beginPath();
+    ctx.moveTo(wireStart.x, wireStart.y);
+    ctx.bezierCurveTo(midX, wireStart.y, midX, wirePreview.y, wirePreview.x, wirePreview.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (hoveredPin) {
+    ctx.strokeStyle = var_accent();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(hoveredPin.x, hoveredPin.y, PIN_R + 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  updateStatus();
+  requestAnimationFrame(render);
+}
+
+function updateStatus() {
+  document.getElementById('status-info').textContent = `Gates: ${gates.length} | Wires: ${wires.length}`;
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-select').classList.toggle('active', m === 'select');
+  document.getElementById('btn-wire').classList.toggle('active', m === 'wire');
+  document.getElementById('btn-delete').classList.toggle('active', m === 'delete');
+  wireStart = null;
+  wirePreview = null;
+  const statusEl = document.getElementById('status-text');
+  if (m === 'select') statusEl.textContent = 'Select — click to select, drag to move';
+  else if (m === 'wire') statusEl.textContent = 'Wire — click output pin, then click input pin';
+  else if (m === 'delete') statusEl.textContent = 'Delete — click a gate or wire to remove';
+}
+
+document.getElementById('btn-select').onclick = () => setMode('select');
+document.getElementById('btn-wire').onclick = () => setMode('wire');
+document.getElementById('btn-delete').onclick = () => setMode('delete');
+document.getElementById('btn-run').onclick = () => {
+  running = !running;
+  const btn = document.getElementById('btn-run');
+  btn.innerHTML = running ? '▶ <span>Run</span>' : '⏸ <span>Pause</span>';
+  btn.classList.toggle('active', running);
+};
+document.getElementById('btn-clear').onclick = () => {
+  gates = []; wires = []; selected = null;
+};
+
+document.querySelectorAll('.gate-btn').forEach(btn => {
+  btn.addEventListener('mousedown', (e) => {
+    const type = btn.dataset.gate;
+    const rect = canvas.getBoundingClientRect();
+    const g = createGate(type, W / 2 - gateWidth({ type }) / 2, H / 2 - gateHeight({ type }) / 2);
+    dragging = g;
+    dragOffX = gateWidth(g) / 2;
+    dragOffY = gateHeight(g) / 2;
+    selected = g;
+    document.getElementById('status-text').textContent = `Placed ${type} gate`;
+  });
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => loadPreset(btn.dataset.preset));
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  contextMenu.style.display = 'none';
+
+  if (e.button === 2) return;
+
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    isPanning = true;
+    panStartX = mx;
+    panStartY = my;
+    panOrigX = panX;
+    panOrigY = panY;
+    return;
+  }
+
+  if (mode === 'wire') {
+    const pin = findPin(mx, my);
+    if (pin) {
+      if (!wireStart) {
+        if (pin.type === 'output') {
+          wireStart = pin;
+          document.getElementById('status-text').textContent = 'Wire — now click an input pin';
+        } else {
+          wireStart = pin;
+          document.getElementById('status-text').textContent = 'Wire — now click an output pin';
+        }
+      } else {
+        if (wireStart.type === 'output' && pin.type === 'input') {
+          addWire(wireStart.gate, wireStart.index, pin.gate, pin.index);
+        } else if (wireStart.type === 'input' && pin.type === 'output') {
+          addWire(pin.gate, pin.index, wireStart.gate, wireStart.index);
+        }
+        wireStart = null;
+        wirePreview = null;
+        document.getElementById('status-text').textContent = 'Wire connected';
+      }
+    } else {
+      wireStart = null;
+      wirePreview = null;
+    }
+    return;
+  }
+
+  if (mode === 'delete') {
+    const pin = findPin(mx, my);
+    if (pin) {
+      const w = wires.find(w => {
+        if (pin.type === 'input') return w.toGate === pin.gate.id && w.toIndex === pin.index;
+        return w.fromGate === pin.gate.id && w.fromIndex === pin.index;
+      });
+      if (w) { deleteWire(w); return; }
+    }
+    const g = findGate(mx, my);
+    if (g) { deleteGate(g); return; }
+    return;
+  }
+
+  const g = findGate(mx, my);
+  if (g) {
+    if (g.type === 'SWITCH' && !e.shiftKey) {
+      g.value = !g.value;
+      return;
+    }
+    selected = g;
+    dragging = g;
+    dragOffX = mx - (g.x + panX);
+    dragOffY = my - (g.y + panY);
+    return;
+  }
+
+  selected = null;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (isPanning) {
+    panX = panOrigX + (mx - panStartX);
+    panY = panOrigY + (my - panStartY);
+    return;
+  }
+
+  if (dragging) {
+    dragging.x = mx - dragOffX - panX;
+    dragging.y = my - dragOffY - panY;
+    const snap = 10;
+    dragging.x = Math.round(dragging.x / snap) * snap;
+    dragging.y = Math.round(dragging.y / snap) * snap;
+    return;
+  }
+
+  if (mode === 'wire' && wireStart) {
+    wirePreview = { x: mx, y: my };
+  }
+
+  hoveredPin = findPin(mx, my);
+});
+
+canvas.addEventListener('mouseup', () => {
+  dragging = null;
+  isPanning = false;
+});
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const g = findGate(mx, my);
+  if (g) {
+    selected = g;
+    contextMenu.style.display = 'block';
+    contextMenu.style.left = e.clientX + 'px';
+    contextMenu.style.top = e.clientY + 'px';
+    document.getElementById('ctx-toggle').style.display = (g.type === 'SWITCH') ? 'flex' : 'none';
+    document.getElementById('ctx-toggle').onclick = () => {
+      g.value = !g.value;
+      contextMenu.style.display = 'none';
+    };
+    document.getElementById('ctx-label').onclick = () => {
+      const name = prompt('Label:', g.label);
+      if (name) g.label = name;
+      contextMenu.style.display = 'none';
+    };
+    document.getElementById('ctx-delete').onclick = () => {
+      deleteGate(g);
+      contextMenu.style.display = 'none';
+    };
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.context-menu')) contextMenu.style.display = 'none';
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'v' || e.key === 'V') setMode('select');
+  if (e.key === 'w' || e.key === 'W') setMode('wire');
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selected) { deleteGate(selected); }
+    else setMode('delete');
+  }
+  if (e.key === ' ') {
+    e.preventDefault();
+    document.getElementById('btn-run').click();
+  }
+  if (e.key === 'Escape') {
+    wireStart = null;
+    wirePreview = null;
+    selected = null;
+    contextMenu.style.display = 'none';
+  }
+});
+
+function loadPreset(name) {
+  gates = [];
+  wires = [];
+  selected = null;
+  nextId = 1;
+  const cx = W / 2, cy = H / 2;
+
+  if (name === 'sr-latch') {
+    const s = createGate('SWITCH', cx - 200, cy - 60);
+    s.label = 'S';
+    const r = createGate('SWITCH', cx - 200, cy + 30);
+    r.label = 'R';
+    const nor1 = createGate('NOR', cx - 40, cy - 60);
+    const nor2 = createGate('NOR', cx - 40, cy + 30);
+    const q = createGate('LED', cx + 100, cy - 60);
+    q.label = 'Q';
+    const qn = createGate('LED', cx + 100, cy + 30);
+    qn.label = "Q'";
+    addWire(s, 0, nor1, 0);
+    addWire(r, 0, nor2, 1);
+    addWire(nor1, 0, q, 0);
+    addWire(nor2, 0, qn, 0);
+    addWire(nor1, 0, nor2, 0);
+    addWire(nor2, 0, nor1, 1);
+    document.getElementById('status-text').textContent = 'Loaded SR Latch — toggle S and R switches';
+  }
+
+  if (name === 'half-adder') {
+    const a = createGate('SWITCH', cx - 220, cy - 50);
+    a.label = 'A';
+    const b = createGate('SWITCH', cx - 220, cy + 40);
+    b.label = 'B';
+    const xorG = createGate('XOR', cx - 60, cy - 50);
+    const andG = createGate('AND', cx - 60, cy + 40);
+    const sum = createGate('LED', cx + 80, cy - 50);
+    sum.label = 'Sum';
+    const carry = createGate('LED', cx + 80, cy + 40);
+    carry.label = 'Carry';
+    addWire(a, 0, xorG, 0);
+    addWire(b, 0, xorG, 1);
+    addWire(a, 0, andG, 0);
+    addWire(b, 0, andG, 1);
+    addWire(xorG, 0, sum, 0);
+    addWire(andG, 0, carry, 0);
+    document.getElementById('status-text').textContent = 'Loaded Half Adder — toggle A and B switches';
+  }
+
+  if (name === 'full-adder') {
+    const a = createGate('SWITCH', cx - 280, cy - 80);
+    a.label = 'A';
+    const b = createGate('SWITCH', cx - 280, cy);
+    b.label = 'B';
+    const cin = createGate('SWITCH', cx - 280, cy + 80);
+    cin.label = 'Cin';
+    const xor1 = createGate('XOR', cx - 120, cy - 80);
+    const and1 = createGate('AND', cx - 120, cy);
+    const xor2 = createGate('XOR', cx + 20, cy - 80);
+    const and2 = createGate('AND', cx + 20, cy);
+    const orG = createGate('OR', cx + 160, cy);
+    const sum = createGate('LED', cx + 160, cy - 80);
+    sum.label = 'Sum';
+    const cout = createGate('LED', cx + 300, cy);
+    cout.label = 'Cout';
+    addWire(a, 0, xor1, 0);
+    addWire(b, 0, xor1, 1);
+    addWire(a, 0, and1, 0);
+    addWire(b, 0, and1, 1);
+    addWire(xor1, 0, xor2, 0);
+    addWire(cin, 0, xor2, 1);
+    addWire(xor1, 0, and2, 0);
+    addWire(cin, 0, and2, 1);
+    addWire(and1, 0, orG, 0);
+    addWire(and2, 0, orG, 1);
+    addWire(xor2, 0, sum, 0);
+    addWire(orG, 0, cout, 0);
+    document.getElementById('status-text').textContent = 'Loaded Full Adder — toggle A, B, Cin switches';
+  }
+
+  if (name === 'mux') {
+    const a = createGate('SWITCH', cx - 240, cy - 80);
+    a.label = 'A';
+    const b = createGate('SWITCH', cx - 240, cy + 60);
+    b.label = 'B';
+    const sel = createGate('SWITCH', cx - 240, cy - 10);
+    sel.label = 'Sel';
+    const notG = createGate('NOT', cx - 100, cy - 10);
+    const and1 = createGate('AND', cx + 20, cy - 60);
+    const and2 = createGate('AND', cx + 20, cy + 40);
+    const orG = createGate('OR', cx + 160, cy - 10);
+    const out = createGate('LED', cx + 300, cy - 10);
+    out.label = 'Out';
+    addWire(sel, 0, notG, 0);
+    addWire(a, 0, and1, 0);
+    addWire(notG, 0, and1, 1);
+    addWire(b, 0, and2, 0);
+    addWire(sel, 0, and2, 1);
+    addWire(and1, 0, orG, 0);
+    addWire(and2, 0, orG, 1);
+    addWire(orG, 0, out, 0);
+    document.getElementById('status-text').textContent = 'Loaded 2:1 Mux — Sel=0: output=A, Sel=1: output=B';
+  }
+
+  if (name === 'counter') {
+    const clk = createGate('CLOCK', cx - 260, cy - 20);
+    clk.clockSpeed = 40;
+    const xor1 = createGate('XOR', cx - 100, cy - 60);
+    const xor2 = createGate('XOR', cx - 100, cy + 40);
+    const and1 = createGate('AND', cx - 100, cy - 10);
+    const led0 = createGate('LED', cx + 80, cy + 40);
+    led0.label = 'Bit 0';
+    const led1 = createGate('LED', cx + 80, cy - 60);
+    led1.label = 'Bit 1';
+    const seg = createGate('7SEG', cx + 200, cy - 30);
+
+    addWire(clk, 0, xor2, 0);
+    addWire(xor2, 0, led0, 0);
+    addWire(xor2, 0, and1, 1);
+    addWire(clk, 0, and1, 0);
+    addWire(and1, 0, xor1, 0);
+    addWire(xor1, 0, led1, 0);
+    addWire(xor2, 0, seg, 0);
+    addWire(xor1, 0, seg, 1);
+
+    document.getElementById('status-text').textContent = 'Loaded 2-Bit Counter (simplified demo) — watch the clock tick';
+  }
+}
+
+window.addEventListener('resize', resize);
+resize();
+render();
+document.getElementById('status-text').textContent = 'Ready — drag gates from sidebar to place, or try a preset';
+</script>
+</body>
+</html>
