@@ -54,7 +54,8 @@
       "Bash(curl -s https://www.shartech.ai/tutorials)",
       "Bash(curl -sI https://www.shartech.ai/tutorials)",
       "Bash(curl -so /dev/null -w \"%{http_code}\" \"https://www.shartech.ai/tutorials/2026-04-24-request-time-off/tutorial.html\")",
-      "Bash(curl -so /dev/null -w \"%{http_code}\" \"https://www.shartech.ai/tutorials/\")"
+      "Bash(curl -so /dev/null -w \"%{http_code}\" \"https://www.shartech.ai/tutorials/\")",
+      "Bash(git -C /Users/shartech/code/Random log --oneline -20)"
     ]
   }
 }

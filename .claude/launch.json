@@ -42,6 +42,24 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "solar-system-orrery", "-l", "3462"],
       "port": 3462
+    },
+    {
+      "name": "boid-flocking",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "boid-flocking", "-l", "3463"],
+      "port": 3463
+    },
+    {
+      "name": "voronoi-tessellation",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "voronoi-tessellation", "-l", "3464"],
+      "port": 3464
+    },
+    {
+      "name": "step-sequencer",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "step-sequencer", "-l", "3465"],
+      "port": 3465
     }
   ]
 }
