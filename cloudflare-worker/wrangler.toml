@@ -1,0 +1,7 @@
+name = "apps-proxy"
+main = "apps-proxy.js"
+compatibility_date = "2026-04-24"
+
+routes = [
+  { pattern = "www.shartech.ai/*", zone_name = "shartech.ai" }
+]

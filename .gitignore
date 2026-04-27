@@ -1,3 +1,4 @@
 .DS_Store
 MacApp/
 node_modules/
+.wrangler/
