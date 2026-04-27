@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tidal Pool Ecosystem</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a1628;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+  cursor: none;
+}
+canvas { display: block; }
+
+#ui {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panel {
+  background: rgba(10, 22, 40, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(100, 180, 255, 0.15);
+  border-radius: 12px;
+  padding: 14px 18px;
+  color: #b8d4f0;
+  font-size: 13px;
+}
+
+h2 {
+  font-size: 15px;
+  color: #e0f0ff;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.btn {
+  background: rgba(60, 130, 200, 0.15);
+  border: 1px solid rgba(100, 180, 255, 0.2);
+  border-radius: 8px;
+  color: #a0c8e8;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn:hover { background: rgba(60, 130, 200, 0.3); color: #e0f0ff; }
+.btn.active { background: rgba(60, 180, 200, 0.3); border-color: rgba(100, 220, 255, 0.4); color: #e0f0ff; }
+
+.stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.stat-item { display: flex; align-items: center; gap: 4px; }
+.stat-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+#cursor {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(150, 220, 255, 0.4);
+  background: radial-gradient(circle, rgba(100, 200, 255, 0.1), transparent);
+  transform: translate(-50%, -50%);
+  transition: width 0.2s, height 0.2s;
+}
+#cursor.pressing {
+  width: 60px;
+  height: 60px;
+  border-color: rgba(150, 220, 255, 0.7);
+  background: radial-gradient(circle, rgba(100, 200, 255, 0.25), transparent);
+}
+
+.hint {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(150, 200, 240, 0.5);
+  font-size: 12px;
+  z-index: 10;
+  pointer-events: none;
+  transition: opacity 2s;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cursor"></div>
+
+<div id="ui">
+  <div class="panel">
+    <h2>🪸 Tidal Pool Ecosystem</h2>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <button class="btn active" data-tide="calm">Calm</button>
+      <button class="btn" data-tide="rising">Rising Tide</button>
+      <button class="btn" data-tide="receding">Receding</button>
+      <button class="btn" data-tide="storm">Storm</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <button class="btn" id="feedBtn">🦐 Drop Food</button>
+      <button class="btn" id="addBtn">+ Creature</button>
+      <button class="btn" id="timeBtn">☀️ Day</button>
+    </div>
+  </div>
+</div>
+
+<div class="hint" id="hint">Move mouse to disturb the water — click to create ripples</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const cursor = document.getElementById('cursor');
+
+let W, H;
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+}
+resize();
+addEventListener('resize', resize);
+
+let mx = W / 2, my = H / 2, pressing = false;
+let tideMode = 'calm';
+let isNight = false;
+let time = 0;
+
+// Ripple system
+const ripples = [];
+class Ripple {
+  constructor(x, y, maxR = 80) {
+    this.x = x; this.y = y;
+    this.r = 0; this.maxR = maxR;
+    this.life = 1;
+  }
+  update() {
+    this.r += 1.5;
+    this.life = 1 - this.r / this.maxR;
+    return this.life > 0;
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(150,220,255,${this.life * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+
+// Water caustics
+class Caustic {
+  constructor() {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.size = 20 + Math.random() * 60;
+    this.speed = 0.3 + Math.random() * 0.5;
+    this.phase = Math.random() * Math.PI * 2;
+    this.drift = (Math.random() - 0.5) * 0.3;
+  }
+  update() {
+    this.phase += 0.01;
+    this.x += this.drift + Math.sin(this.phase) * 0.2;
+    this.y += Math.cos(this.phase * 0.7) * 0.15;
+    if (this.x < -100) this.x = W + 100;
+    if (this.x > W + 100) this.x = -100;
+    if (this.y < -100) this.y = H + 100;
+    if (this.y > H + 100) this.y = -100;
+  }
+  draw() {
+    const alpha = (isNight ? 0.02 : 0.04) * (0.5 + 0.5 * Math.sin(this.phase));
+    ctx.beginPath();
+    ctx.ellipse(this.x, this.y, this.size, this.size * 0.6, this.phase, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(100,200,240,${alpha})`;
+    ctx.fill();
+  }
+}
+
+// Rock
+class Rock {
+  constructor(x, y, size) {
+    this.x = x; this.y = y; this.size = size;
+    this.color = `hsl(${20 + Math.random() * 30}, ${10 + Math.random() * 15}%, ${20 + Math.random() * 15}%)`;
+    this.points = [];
+    const n = 7 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const r = size * (0.7 + Math.random() * 0.3);
+      this.points.push({ x: Math.cos(a) * r, y: Math.sin(a) * r * 0.7 });
+    }
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.moveTo(this.x + this.points[0].x, this.y + this.points[0].y);
+    for (let i = 1; i < this.points.length; i++) {
+      const p = this.points[i];
+      const pp = this.points[(i + 1) % this.points.length];
+      const cx = this.x + (p.x + pp.x) / 2;
+      const cy = this.y + (p.y + pp.y) / 2;
+      ctx.quadraticCurveTo(this.x + p.x, this.y + p.y, cx, cy);
+    }
+    ctx.closePath();
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+// Seaweed
+class Seaweed {
+  constructor(x, y) {
+    this.x = x; this.baseY = y;
+    this.segments = 6 + Math.floor(Math.random() * 6);
+    this.segLen = 12 + Math.random() * 10;
+    this.hue = 100 + Math.random() * 40;
+    this.phase = Math.random() * Math.PI * 2;
+    this.width = 3 + Math.random() * 4;
+  }
+  draw() {
+    const sway = tideMode === 'storm' ? 12 : tideMode === 'rising' ? 6 : 3;
+    let px = this.x, py = this.baseY;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    for (let i = 0; i < this.segments; i++) {
+      const t = i / this.segments;
+      const dx = Math.sin(time * 0.02 + this.phase + i * 0.5) * sway * t;
+      const cursorDist = Math.hypot(px - mx, py - my);
+      const cursorPush = cursorDist < 100 ? (1 - cursorDist / 100) * 15 * Math.sign(px - mx) : 0;
+      px = this.x + dx + cursorPush * t;
+      py = this.baseY - (i + 1) * this.segLen;
+      ctx.lineTo(px, py);
+    }
+    const alpha = isNight ? 0.6 : 0.8;
+    ctx.strokeStyle = `hsla(${this.hue}, 60%, ${isNight ? 20 : 35}%, ${alpha})`;
+    ctx.lineWidth = this.width;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Leaf tips
+    ctx.beginPath();
+    ctx.arc(px, py, this.width * 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue}, 70%, ${isNight ? 25 : 40}%, ${alpha})`;
+    ctx.fill();
+  }
+}
+
+// Anemone
+class Anemone {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.tentacles = 10 + Math.floor(Math.random() * 8);
+    this.tentLen = 25 + Math.random() * 30;
+    this.hue = Math.random() < 0.5 ? (330 + Math.random() * 40) : (180 + Math.random() * 50);
+    this.phase = Math.random() * Math.PI * 2;
+    this.retractAmt = 0;
+    this.baseR = 12 + Math.random() * 8;
+  }
+  update() {
+    const d = Math.hypot(this.x - mx, this.y - my);
+    if (d < 80 || pressing && d < 120) {
+      this.retractAmt = Math.min(1, this.retractAmt + 0.08);
+    } else {
+      this.retractAmt = Math.max(0, this.retractAmt - 0.02);
+    }
+  }
+  draw() {
+    const len = this.tentLen * (1 - this.retractAmt * 0.7);
+    const sway = tideMode === 'storm' ? 8 : 3;
+    for (let i = 0; i < this.tentacles; i++) {
+      const a = (i / this.tentacles) * Math.PI * 2;
+      const tipX = this.x + Math.cos(a) * len + Math.sin(time * 0.03 + this.phase + i) * sway;
+      const tipY = this.y + Math.sin(a) * len * 0.5 - len * 0.3 + Math.cos(time * 0.02 + i) * sway * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      const cpx = (this.x + tipX) / 2 + Math.sin(time * 0.02 + i) * 10;
+      const cpy = (this.y + tipY) / 2;
+      ctx.quadraticCurveTo(cpx, cpy, tipX, tipY);
+      const alpha = isNight ? 0.5 : 0.7;
+      ctx.strokeStyle = `hsla(${this.hue}, 70%, ${isNight ? 40 : 60}%, ${alpha})`;
+      ctx.lineWidth = 2.5 - (1.5 * (1 - this.retractAmt));
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Tip glow
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${this.hue}, 80%, 70%, ${(isNight ? 0.7 : 0.5) * (1 - this.retractAmt * 0.5)})`;
+      ctx.fill();
+    }
+    // Base
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.baseR, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue}, 50%, ${isNight ? 25 : 35}%, 0.8)`;
+    ctx.fill();
+  }
+}
+
+// Starfish
+class Starfish {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.angle = Math.random() * Math.PI * 2;
+    this.size = 15 + Math.random() * 12;
+    this.hue = 10 + Math.random() * 40;
+    this.speed = 0.1 + Math.random() * 0.15;
+    this.turnTimer = 200 + Math.random() * 300;
+    this.turnDir = Math.random() < 0.5 ? 1 : -1;
+    this.fleeing = false;
+  }
+  update() {
+    const d = Math.hypot(this.x - mx, this.y - my);
+    if (d < 100) {
+      this.fleeing = true;
+      const a = Math.atan2(this.y - my, this.x - mx);
+      this.angle = a;
+      this.x += Math.cos(a) * 0.8;
+      this.y += Math.sin(a) * 0.8;
+    } else {
+      this.fleeing = false;
+      this.turnTimer--;
+      if (this.turnTimer <= 0) {
+        this.turnDir = Math.random() < 0.5 ? 1 : -1;
+        this.turnTimer = 200 + Math.random() * 300;
+      }
+      this.angle += this.turnDir * 0.003;
+      this.x += Math.cos(this.angle) * this.speed;
+      this.y += Math.sin(this.angle) * this.speed;
+    }
+    // Bounds
+    if (this.x < 20) { this.x = 20; this.angle = 0; }
+    if (this.x > W - 20) { this.x = W - 20; this.angle = Math.PI; }
+    if (this.y < 20) { this.y = 20; this.angle = Math.PI / 2; }
+    if (this.y > H - 20) { this.y = H - 20; this.angle = -Math.PI / 2; }
+  }
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    const arms = 5;
+    ctx.beginPath();
+    for (let i = 0; i < arms * 2; i++) {
+      const a = (i / (arms * 2)) * Math.PI * 2 - Math.PI / 2;
+      const r = i % 2 === 0 ? this.size : this.size * 0.4;
+      const px = Math.cos(a) * r;
+      const py = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else {
+        const prevA = ((i - 1) / (arms * 2)) * Math.PI * 2 - Math.PI / 2;
+        const prevR = (i - 1) % 2 === 0 ? this.size : this.size * 0.4;
+        const midA = (prevA + a) / 2;
+        const midR = (prevR + r) / 2 * 1.1;
+        ctx.quadraticCurveTo(Math.cos(midA) * midR, Math.sin(midA) * midR, px, py);
+      }
+    }
+    ctx.closePath();
+    ctx.fillStyle = `hsla(${this.hue}, 70%, ${isNight ? 35 : 50}%, 0.85)`;
+    ctx.fill();
+    ctx.strokeStyle = `hsla(${this.hue}, 60%, ${isNight ? 25 : 40}%, 0.6)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Center dot pattern
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const d = this.size * 0.3;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * d, Math.sin(a) * d, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${this.hue + 20}, 80%, 70%, 0.6)`;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// Crab
+class Crab {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.size = 10 + Math.random() * 8;
+    this.hue = 0 + Math.random() * 30;
+    this.dir = Math.random() < 0.5 ? 1 : -1;
+    this.speed = 0.5 + Math.random() * 1;
+    this.legPhase = Math.random() * Math.PI * 2;
+    this.moveTimer = 0;
+    this.resting = true;
+    this.restTimer = 100 + Math.random() * 200;
+    this.fleeing = false;
+  }
+  update() {
+    const d = Math.hypot(this.x - mx, this.y - my);
+    if (d < 90) {
+      this.fleeing = true;
+      this.resting = false;
+      const flee = this.x > mx ? 1 : -1;
+      this.dir = flee;
+      this.x += flee * this.speed * 3;
+      this.legPhase += 0.3;
+    } else {
+      this.fleeing = false;
+      if (this.resting) {
+        this.restTimer--;
+        if (this.restTimer <= 0) {
+          this.resting = false;
+          this.moveTimer = 50 + Math.random() * 150;
+          this.dir = Math.random() < 0.5 ? 1 : -1;
+        }
+      } else {
+        this.moveTimer--;
+        this.x += this.dir * this.speed;
+        this.legPhase += 0.15;
+        if (this.moveTimer <= 0) {
+          this.resting = true;
+          this.restTimer = 100 + Math.random() * 200;
+        }
+      }
+    }
+    if (this.x < 30) { this.x = 30; this.dir = 1; }
+    if (this.x > W - 30) { this.x = W - 30; this.dir = -1; }
+  }
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    const s = this.size;
+    // Legs
+    for (let side = -1; side <= 1; side += 2) {
+      for (let i = 0; i < 3; i++) {
+        const legOff = Math.sin(this.legPhase + i * 1.2) * 3;
+        const lx = side * (s * 0.6 + i * 4);
+        const ly = legOff + 2;
+        ctx.beginPath();
+        ctx.moveTo(side * s * 0.3, 0);
+        ctx.lineTo(lx, ly);
+        ctx.strokeStyle = `hsla(${this.hue}, 60%, ${isNight ? 30 : 45}%, 0.8)`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s, s * 0.7, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue}, 65%, ${isNight ? 30 : 45}%, 0.9)`;
+    ctx.fill();
+    // Eyes
+    const eyeDir = this.dir;
+    for (let side = -1; side <= 1; side += 2) {
+      ctx.beginPath();
+      ctx.arc(side * s * 0.5, -s * 0.5, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#111';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(side * s * 0.5 + eyeDir, -s * 0.5 - 1, 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+    // Claws
+    for (let side = -1; side <= 1; side += 2) {
+      const clawX = side * (s + 5);
+      const clawOpen = Math.sin(time * 0.05) * 0.15;
+      ctx.save();
+      ctx.translate(clawX, -2);
+      ctx.rotate(side * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(side * 6, -5 - clawOpen * 10);
+      ctx.lineTo(side * 2, -2);
+      ctx.lineTo(side * 6, 3 + clawOpen * 10);
+      ctx.closePath();
+      ctx.fillStyle = `hsla(${this.hue}, 70%, ${isNight ? 35 : 50}%, 0.9)`;
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+}
+
+// Small fish
+class Fish {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.size = 6 + Math.random() * 8;
+    this.hue = Math.random() * 360;
+    this.speed = 0.5 + Math.random() * 1.5;
+    this.angle = Math.random() * Math.PI * 2;
+    this.tailPhase = Math.random() * Math.PI * 2;
+    this.schoolTarget = null;
+    this.turnSpeed = 0.02 + Math.random() * 0.03;
+  }
+  update() {
+    const d = Math.hypot(this.x - mx, this.y - my);
+    if (d < 120) {
+      const fleeA = Math.atan2(this.y - my, this.x - mx);
+      this.angle += angleDiff(this.angle, fleeA) * 0.1;
+      this.x += Math.cos(this.angle) * this.speed * 2.5;
+      this.y += Math.sin(this.angle) * this.speed * 2.5;
+    } else {
+      // Gentle wandering with edge avoidance
+      const edgePad = 60;
+      if (this.x < edgePad) this.angle += 0.05;
+      else if (this.x > W - edgePad) this.angle -= 0.05;
+      if (this.y < edgePad) this.angle += (this.angle < 0 ? 0.05 : -0.05);
+      else if (this.y > H - edgePad) this.angle += (this.angle > 0 ? -0.05 : 0.05);
+
+      this.angle += (Math.random() - 0.5) * 0.1;
+      this.x += Math.cos(this.angle) * this.speed;
+      this.y += Math.sin(this.angle) * this.speed;
+    }
+    this.tailPhase += 0.2;
+    // Wrap
+    if (this.x < -20) this.x = W + 20;
+    if (this.x > W + 20) this.x = -20;
+    if (this.y < -20) this.y = H + 20;
+    if (this.y > H + 20) this.y = -20;
+  }
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    const s = this.size;
+    const tailWag = Math.sin(this.tailPhase) * 3;
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s, s * 0.4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue}, 70%, ${isNight ? 45 : 60}%, 0.85)`;
+    ctx.fill();
+    // Tail
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.7, 0);
+    ctx.lineTo(-s * 1.4, -s * 0.4 + tailWag);
+    ctx.lineTo(-s * 1.4, s * 0.4 + tailWag);
+    ctx.closePath();
+    ctx.fillStyle = `hsla(${this.hue}, 60%, ${isNight ? 40 : 55}%, 0.8)`;
+    ctx.fill();
+    // Eye
+    ctx.beginPath();
+    ctx.arc(s * 0.4, -s * 0.1, s * 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = '#222';
+    ctx.fill();
+    // Dorsal fin
+    ctx.beginPath();
+    ctx.moveTo(s * 0.1, -s * 0.35);
+    ctx.lineTo(-s * 0.3, -s * 0.7);
+    ctx.lineTo(-s * 0.5, -s * 0.35);
+    ctx.fillStyle = `hsla(${this.hue + 20}, 60%, ${isNight ? 50 : 65}%, 0.6)`;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// Food particle
+class FoodParticle {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.size = 2 + Math.random() * 2;
+    this.vy = 0.2 + Math.random() * 0.3;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.life = 1;
+    this.decay = 0.001 + Math.random() * 0.002;
+  }
+  update() {
+    this.x += this.vx + Math.sin(time * 0.02) * 0.1;
+    this.y += this.vy;
+    this.life -= this.decay;
+    return this.life > 0;
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200, 180, 100, ${this.life * 0.7})`;
+    ctx.fill();
+  }
+}
+
+// Bubble
+class Bubble {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.r = 1 + Math.random() * 4;
+    this.vy = -0.5 - Math.random() * 1;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.life = 1;
+  }
+  update() {
+    this.y += this.vy;
+    this.x += this.vx + Math.sin(time * 0.03 + this.x * 0.01) * 0.2;
+    this.life -= 0.005;
+    this.r *= 1.001;
+    return this.life > 0 && this.y > -10;
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(180, 220, 255, ${this.life * 0.4})`;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    // Highlight
+    ctx.beginPath();
+    ctx.arc(this.x - this.r * 0.3, this.y - this.r * 0.3, this.r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220, 240, 255, ${this.life * 0.3})`;
+    ctx.fill();
+  }
+}
+
+// Bioluminescent plankton
+class Plankton {
+  constructor() {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.size = 1 + Math.random() * 2;
+    this.phase = Math.random() * Math.PI * 2;
+    this.hue = 180 + Math.random() * 60;
+    this.vx = (Math.random() - 0.5) * 0.2;
+    this.vy = (Math.random() - 0.5) * 0.2;
+    this.glow = 0;
+  }
+  update() {
+    this.phase += 0.02;
+    this.x += this.vx + Math.sin(this.phase) * 0.1;
+    this.y += this.vy + Math.cos(this.phase * 0.7) * 0.1;
+    const d = Math.hypot(this.x - mx, this.y - my);
+    if (d < 80) {
+      this.glow = Math.min(1, this.glow + 0.15);
+    } else {
+      this.glow = Math.max(isNight ? 0.2 : 0, this.glow - 0.02);
+    }
+    if (this.x < 0) this.x = W;
+    if (this.x > W) this.x = 0;
+    if (this.y < 0) this.y = H;
+    if (this.y > H) this.y = 0;
+  }
+  draw() {
+    const brightness = this.glow * (isNight ? 1 : 0.5);
+    if (brightness < 0.01) return;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size + this.glow * 3, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue}, 100%, 70%, ${brightness * 0.8})`;
+    ctx.fill();
+    if (this.glow > 0.3) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size + this.glow * 8, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${this.hue}, 100%, 60%, ${brightness * 0.15})`;
+      ctx.fill();
+    }
+  }
+}
+
+function angleDiff(a, b) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+// Initialize world
+const caustics = Array.from({ length: 25 }, () => new Caustic());
+const rocks = [];
+const seaweeds = [];
+const anemones = [];
+const starfishes = [];
+const crabs = [];
+const fishes = [];
+const foodParticles = [];
+const bubbles = [];
+const plankton = Array.from({ length: 80 }, () => new Plankton());
+
+// Place rocks
+for (let i = 0; i < 8; i++) {
+  rocks.push(new Rock(
+    100 + Math.random() * (W - 200),
+    100 + Math.random() * (H - 200),
+    25 + Math.random() * 40
+  ));
+}
+
+// Place seaweed near rocks and edges
+for (let i = 0; i < 15; i++) {
+  const r = rocks[Math.floor(Math.random() * rocks.length)];
+  seaweeds.push(new Seaweed(
+    r ? r.x + (Math.random() - 0.5) * 60 : Math.random() * W,
+    r ? r.y + r.size * 0.3 : H - 20
+  ));
+}
+for (let i = 0; i < 8; i++) {
+  seaweeds.push(new Seaweed(Math.random() * W, H - 10 + Math.random() * 20));
+}
+
+// Place anemones on rocks
+for (let i = 0; i < 5; i++) {
+  const r = rocks[i % rocks.length];
+  anemones.push(new Anemone(r.x + (Math.random() - 0.5) * 20, r.y - r.size * 0.3));
+}
+
+// Place creatures
+for (let i = 0; i < 4; i++) {
+  starfishes.push(new Starfish(100 + Math.random() * (W - 200), 100 + Math.random() * (H - 200)));
+}
+for (let i = 0; i < 3; i++) {
+  crabs.push(new Crab(100 + Math.random() * (W - 200), H * 0.6 + Math.random() * (H * 0.35)));
+}
+for (let i = 0; i < 12; i++) {
+  fishes.push(new Fish(Math.random() * W, Math.random() * H));
+}
+
+// UI
+const tideButtons = document.querySelectorAll('[data-tide]');
+tideButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tideButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tideMode = btn.dataset.tide;
+  });
+});
+
+document.getElementById('feedBtn').addEventListener('click', () => {
+  for (let i = 0; i < 15; i++) {
+    foodParticles.push(new FoodParticle(
+      mx + (Math.random() - 0.5) * 60,
+      my + (Math.random() - 0.5) * 40
+    ));
+  }
+});
+
+document.getElementById('addBtn').addEventListener('click', () => {
+  const r = Math.random();
+  if (r < 0.25) starfishes.push(new Starfish(mx, my));
+  else if (r < 0.5) crabs.push(new Crab(mx, my));
+  else if (r < 0.75) fishes.push(new Fish(mx, my));
+  else anemones.push(new Anemone(mx, my));
+});
+
+const timeBtn = document.getElementById('timeBtn');
+timeBtn.addEventListener('click', () => {
+  isNight = !isNight;
+  timeBtn.textContent = isNight ? '🌙 Night' : '☀️ Day';
+});
+
+// Input
+addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx + 'px';
+  cursor.style.top = my + 'px';
+});
+addEventListener('mousedown', () => {
+  pressing = true;
+  cursor.classList.add('pressing');
+  ripples.push(new Ripple(mx, my, 120));
+  for (let i = 0; i < 3; i++) {
+    bubbles.push(new Bubble(mx + (Math.random() - 0.5) * 20, my + (Math.random() - 0.5) * 20));
+  }
+});
+addEventListener('mouseup', () => {
+  pressing = false;
+  cursor.classList.remove('pressing');
+});
+addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  mx = t.clientX; my = t.clientY;
+  pressing = true;
+  ripples.push(new Ripple(mx, my, 120));
+});
+addEventListener('touchmove', e => {
+  const t = e.touches[0];
+  mx = t.clientX; my = t.clientY;
+  e.preventDefault();
+}, { passive: false });
+addEventListener('touchend', () => { pressing = false; });
+
+// Stats
+function updateStats() {
+  const el = document.getElementById('stats');
+  el.innerHTML = `
+    <div class="stat-item"><div class="stat-dot" style="background:#e07050"></div>${starfishes.length} Starfish</div>
+    <div class="stat-item"><div class="stat-dot" style="background:#e06040"></div>${crabs.length} Crabs</div>
+    <div class="stat-item"><div class="stat-dot" style="background:#50a0e0"></div>${fishes.length} Fish</div>
+    <div class="stat-item"><div class="stat-dot" style="background:#e070a0"></div>${anemones.length} Anemones</div>
+    <div class="stat-item"><div class="stat-dot" style="background:#60d0c0"></div>${plankton.length} Plankton</div>
+  `;
+}
+
+// Hint fade
+setTimeout(() => {
+  document.getElementById('hint').style.opacity = '0';
+}, 5000);
+
+// Tide current effect
+function getTideCurrent() {
+  switch (tideMode) {
+    case 'rising': return { x: Math.sin(time * 0.005) * 0.5, y: -0.3 };
+    case 'receding': return { x: Math.sin(time * 0.005) * 0.5, y: 0.3 };
+    case 'storm': return { x: Math.sin(time * 0.02) * 2, y: Math.cos(time * 0.015) * 1.5 };
+    default: return { x: Math.sin(time * 0.003) * 0.1, y: 0 };
+  }
+}
+
+// Main loop
+function animate() {
+  time++;
+
+  const bgLight = isNight ? '#050d1a' : '#0a1628';
+  const bgDark = isNight ? '#020810' : '#061020';
+  const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+  grad.addColorStop(0, bgLight);
+  grad.addColorStop(1, bgDark);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Sandy bottom gradient
+  const sandGrad = ctx.createLinearGradient(0, H * 0.8, 0, H);
+  sandGrad.addColorStop(0, 'rgba(40, 35, 25, 0)');
+  sandGrad.addColorStop(1, `rgba(40, 35, 25, ${isNight ? 0.15 : 0.25})`);
+  ctx.fillStyle = sandGrad;
+  ctx.fillRect(0, H * 0.8, W, H * 0.2);
+
+  // Caustics
+  caustics.forEach(c => { c.update(); c.draw(); });
+
+  // Tide current
+  const current = getTideCurrent();
+
+  // Rocks
+  rocks.forEach(r => r.draw());
+
+  // Seaweed
+  seaweeds.forEach(s => s.draw());
+
+  // Food
+  for (let i = foodParticles.length - 1; i >= 0; i--) {
+    if (!foodParticles[i].update()) foodParticles.splice(i, 1);
+    else foodParticles[i].draw();
+  }
+
+  // Anemones
+  anemones.forEach(a => { a.update(); a.draw(); });
+
+  // Starfish
+  starfishes.forEach(s => {
+    s.x += current.x * 0.2;
+    s.y += current.y * 0.2;
+    s.update();
+    s.draw();
+  });
+
+  // Crabs
+  crabs.forEach(c => {
+    c.x += current.x * 0.1;
+    c.update();
+    c.draw();
+  });
+
+  // Fish (attracted to food)
+  fishes.forEach(f => {
+    f.x += current.x * 0.3;
+    f.y += current.y * 0.3;
+    // Seek nearest food
+    if (foodParticles.length > 0) {
+      let nearest = null, nd = Infinity;
+      for (const fp of foodParticles) {
+        const d = Math.hypot(f.x - fp.x, f.y - fp.y);
+        if (d < nd) { nd = d; nearest = fp; }
+      }
+      if (nearest && nd < 150) {
+        const toFood = Math.atan2(nearest.y - f.y, nearest.x - f.x);
+        f.angle += angleDiff(f.angle, toFood) * 0.05;
+        if (nd < 10) {
+          const idx = foodParticles.indexOf(nearest);
+          if (idx !== -1) foodParticles.splice(idx, 1);
+        }
+      }
+    }
+    f.update();
+    f.draw();
+  });
+
+  // Plankton
+  plankton.forEach(p => {
+    p.vx += current.x * 0.01;
+    p.vy += current.y * 0.01;
+    p.vx *= 0.99;
+    p.vy *= 0.99;
+    p.update();
+    p.draw();
+  });
+
+  // Bubbles
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    if (!bubbles[i].update()) bubbles.splice(i, 1);
+    else bubbles[i].draw();
+  }
+
+  // Ripples
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    if (!ripples[i].update()) ripples.splice(i, 1);
+    else ripples[i].draw();
+  }
+
+  // Ambient bubbles
+  if (Math.random() < (tideMode === 'storm' ? 0.15 : 0.03)) {
+    bubbles.push(new Bubble(Math.random() * W, H + 10));
+  }
+
+  // Mouse movement bubbles
+  if (pressing && Math.random() < 0.3) {
+    bubbles.push(new Bubble(mx + (Math.random() - 0.5) * 30, my + (Math.random() - 0.5) * 30));
+  }
+
+  // Light shaft effect
+  if (!isNight) {
+    for (let i = 0; i < 3; i++) {
+      const sx = W * (0.2 + i * 0.3) + Math.sin(time * 0.003 + i) * 50;
+      const lg = ctx.createLinearGradient(sx, 0, sx + 40, H);
+      lg.addColorStop(0, 'rgba(100,180,220,0.03)');
+      lg.addColorStop(0.5, 'rgba(100,180,220,0.01)');
+      lg.addColorStop(1, 'rgba(100,180,220,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(sx - 20, 0, 80, H);
+    }
+  }
+
+  // Vignette
+  const vign = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.8);
+  vign.addColorStop(0, 'rgba(0,0,0,0)');
+  vign.addColorStop(1, `rgba(0,0,0,${isNight ? 0.5 : 0.3})`);
+  ctx.fillStyle = vign;
+  ctx.fillRect(0, 0, W, H);
+
+  if (time % 60 === 0) updateStats();
+
+  requestAnimationFrame(animate);
+}
+
+updateStats();
+animate();
+</script>
+</body>
+</html>

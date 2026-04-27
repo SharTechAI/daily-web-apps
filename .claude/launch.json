@@ -114,6 +114,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "lightning-storm-generator", "-l", "3474"],
       "port": 3474
+    },
+    {
+      "name": "tidal-pool-ecosystem",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "tidal-pool-ecosystem", "-l", "3475"],
+      "port": 3475
     }
   ]
 }
