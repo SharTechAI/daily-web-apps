@@ -126,6 +126,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "zen-garden", "-l", "3476"],
       "port": 3476
+    },
+    {
+      "name": "neon-sign-workshop",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "neon-sign-workshop", "-l", "3477"],
+      "port": 3477
     }
   ]
 }

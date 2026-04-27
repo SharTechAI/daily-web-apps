@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Sign Workshop</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Monoton&family=Press+Start+2P&family=Sacramento&family=Permanent+Marker&family=Orbitron:wght@700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #111;
+    color: #fff;
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  #wall {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .wall-brick {
+    background: #2a1a1a;
+    background-image:
+      linear-gradient(to right, #1a1010 1px, transparent 1px),
+      linear-gradient(to bottom, #1a1010 1px, transparent 1px),
+      linear-gradient(to right, #1a1010 1px, transparent 1px);
+    background-size: 60px 30px, 60px 30px, 60px 30px;
+    background-position: 0 0, 0 0, 30px 15px;
+  }
+
+  .wall-dark { background: #0a0a0f; }
+
+  .wall-concrete {
+    background: #1a1a1e;
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+
+  .wall-wood {
+    background: #1a1208;
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 20px,
+      rgba(0,0,0,0.1) 20px,
+      rgba(0,0,0,0.1) 21px
+    );
+  }
+
+  .wall-metal {
+    background: linear-gradient(135deg, #1a1a20, #12121a, #1a1a20);
+    background-size: 4px 4px;
+  }
+
+  #neon-container {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 40px;
+    max-width: 90%;
+    cursor: move;
+  }
+
+  .neon-text {
+    font-size: 72px;
+    font-family: 'Pacifico', cursive;
+    line-height: 1.3;
+    white-space: pre-wrap;
+    word-break: break-word;
+    transition: text-shadow 0.1s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .neon-off .neon-text {
+    opacity: 0.15;
+    text-shadow: none !important;
+    filter: grayscale(1);
+  }
+
+  .wall-glow {
+    position: absolute;
+    width: 120%;
+    height: 120%;
+    top: -10%;
+    left: -10%;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1;
+    filter: blur(80px);
+    opacity: 0.15;
+    transition: opacity 0.3s;
+  }
+
+  .neon-off .wall-glow { opacity: 0; }
+
+  #draw-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    cursor: crosshair;
+    display: none;
+  }
+
+  .draw-active #draw-canvas { display: block; }
+
+  #sidebar {
+    width: 320px;
+    background: #141418;
+    border-left: 1px solid #2a2a35;
+    overflow-y: auto;
+    padding: 20px;
+    z-index: 20;
+    flex-shrink: 0;
+  }
+
+  .panel { margin-bottom: 20px; }
+
+  .panel-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #666;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+
+  .text-input {
+    width: 100%;
+    background: #1e1e24;
+    border: 1px solid #2a2a35;
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #fff;
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .text-input:focus { border-color: #7c6ff7; }
+
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .color-btn {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .color-btn::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .color-btn.active { border-color: #fff; transform: scale(1.08); }
+  .color-btn:hover { transform: scale(1.05); }
+
+  .font-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .font-btn {
+    padding: 8px 6px;
+    background: #1e1e24;
+    border: 1px solid #2a2a35;
+    border-radius: 8px;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.72rem;
+    transition: all 0.2s;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .font-btn.active { border-color: #7c6ff7; color: #fff; background: #252530; }
+  .font-btn:hover { border-color: #444; }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .slider-label {
+    font-size: 0.78rem;
+    color: #888;
+    min-width: 80px;
+  }
+
+  .slider-val {
+    font-size: 0.75rem;
+    color: #666;
+    min-width: 30px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: #2a2a35;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #7c6ff7;
+    cursor: pointer;
+  }
+
+  .wall-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+
+  .wall-btn {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.6rem;
+    color: #888;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wall-btn.active { border-color: #7c6ff7; }
+  .wall-btn:hover { border-color: #444; }
+
+  .effect-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .effect-btn {
+    padding: 8px 10px;
+    background: #1e1e24;
+    border: 1px solid #2a2a35;
+    border-radius: 8px;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .effect-btn.active { border-color: #7c6ff7; color: #fff; background: #252530; }
+  .effect-btn:hover { border-color: #444; }
+
+  .power-switch {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #2a2a35;
+    background: #1e1e24;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .power-switch:hover { background: #252530; }
+
+  .power-switch .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade80;
+    transition: all 0.2s;
+  }
+
+  .neon-off .power-switch .dot,
+  .power-off .dot {
+    background: #555;
+    box-shadow: none;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #2a2a35;
+    background: #1e1e24;
+    color: #aaa;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .action-btn:hover { background: #252530; color: #fff; }
+  .action-btn.active { background: #7c6ff7; color: #fff; border-color: #7c6ff7; }
+
+  .mounting-dots {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #333;
+    border: 1px solid #444;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+  }
+
+  .neon-bracket {
+    position: absolute;
+    width: 30px;
+    height: 6px;
+    background: #333;
+    border-radius: 2px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  }
+
+  #presets-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .preset-btn {
+    padding: 8px;
+    background: #1e1e24;
+    border: 1px solid #2a2a35;
+    border-radius: 8px;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .preset-btn:hover { background: #252530; color: #fff; border-color: #444; }
+
+  @media (max-width: 768px) {
+    body { flex-direction: column-reverse; }
+    #sidebar {
+      width: 100%;
+      height: 45vh;
+      border-left: none;
+      border-top: 1px solid #2a2a35;
+    }
+    #wall { height: 55vh; }
+    .neon-text { font-size: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="wall" class="wall-brick">
+  <div class="wall-glow" id="wall-glow"></div>
+  <div id="neon-container">
+    <div class="neon-text" id="neon-text">OPEN</div>
+    <div class="neon-bracket" style="top:-8px;left:20%"></div>
+    <div class="neon-bracket" style="top:-8px;right:20%"></div>
+  </div>
+  <canvas id="draw-canvas"></canvas>
+</div>
+
+<div id="sidebar">
+  <div class="panel">
+    <div class="panel-title">Power</div>
+    <button class="power-switch" id="power-btn">
+      <div class="dot"></div>
+      <span>ON</span>
+    </button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Text</div>
+    <textarea class="text-input" id="text-input" placeholder="Type your sign...">OPEN</textarea>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Tube Color</div>
+    <div class="color-grid" id="color-grid"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Font</div>
+    <div class="font-grid" id="font-grid"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Settings</div>
+    <div class="slider-row">
+      <span class="slider-label">Size</span>
+      <input type="range" id="size-slider" min="20" max="160" value="72">
+      <span class="slider-val" id="size-val">72</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Glow</span>
+      <input type="range" id="glow-slider" min="0" max="100" value="60">
+      <span class="slider-val" id="glow-val">60</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Letter Gap</span>
+      <input type="range" id="spacing-slider" min="-5" max="30" value="2">
+      <span class="slider-val" id="spacing-val">2</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Flicker Effect</div>
+    <div class="effect-grid" id="effect-grid"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Wall</div>
+    <div class="wall-grid" id="wall-grid"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Presets</div>
+    <div id="presets-row"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Tools</div>
+    <div class="action-row">
+      <button class="action-btn" id="draw-btn">✏️ Draw</button>
+      <button class="action-btn" id="clear-draw-btn">🗑️ Clear Lines</button>
+      <button class="action-btn" id="screenshot-btn">📸 Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  { name: 'Hot Pink',    hex: '#ff2d7b', glow: '#ff2d7b', bg: '#ff69b455' },
+  { name: 'Electric Blue',hex: '#00bfff', glow: '#00bfff', bg: '#00bfff44' },
+  { name: 'Neon Green',  hex: '#39ff14', glow: '#39ff14', bg: '#39ff1444' },
+  { name: 'Amber',       hex: '#ffaa00', glow: '#ffaa00', bg: '#ffaa0044' },
+  { name: 'White',       hex: '#ffffff', glow: '#e8e8ff', bg: '#ffffff33' },
+  { name: 'Red',         hex: '#ff1744', glow: '#ff1744', bg: '#ff174444' },
+  { name: 'Violet',      hex: '#b44dff', glow: '#b44dff', bg: '#b44dff44' },
+  { name: 'Teal',        hex: '#00ffc8', glow: '#00ffc8', bg: '#00ffc844' },
+];
+
+const FONTS = [
+  { name: 'Script',      family: "'Pacifico', cursive" },
+  { name: 'Display',     family: "'Monoton', cursive" },
+  { name: 'Pixel',       family: "'Press Start 2P', monospace" },
+  { name: 'Elegant',     family: "'Sacramento', cursive" },
+  { name: 'Marker',      family: "'Permanent Marker', cursive" },
+  { name: 'Futuristic',  family: "'Orbitron', sans-serif" },
+];
+
+const WALLS = [
+  { name: 'Brick',    cls: 'wall-brick',    bg: '#2a1a1a' },
+  { name: 'Dark',     cls: 'wall-dark',     bg: '#0a0a0f' },
+  { name: 'Concrete', cls: 'wall-concrete', bg: '#1a1a1e' },
+  { name: 'Wood',     cls: 'wall-wood',     bg: '#1a1208' },
+  { name: 'Metal',    cls: 'wall-metal',    bg: '#16161c' },
+];
+
+const EFFECTS = [
+  { name: 'Steady',     id: 'steady' },
+  { name: 'Subtle',     id: 'subtle' },
+  { name: 'Buzz',       id: 'buzz' },
+  { name: 'Flicker',    id: 'flicker' },
+  { name: 'Pulse',      id: 'pulse' },
+  { name: 'Dying',      id: 'dying' },
+];
+
+const PRESETS = [
+  { name: '🍸 Bar',      text: 'COCKTAILS', color: 0, font: 0, wall: 0, effect: 1, size: 64, glow: 70 },
+  { name: '🌃 Hotel',    text: 'HOTEL', color: 4, font: 1, wall: 1, effect: 0, size: 90, glow: 50 },
+  { name: '🎵 Music',    text: 'LIVE\nMUSIC', color: 6, font: 4, wall: 2, effect: 2, size: 60, glow: 65 },
+  { name: '☕ Cafe',     text: 'OPEN', color: 3, font: 0, wall: 3, effect: 1, size: 80, glow: 55 },
+  { name: '🕹️ Arcade',  text: 'PLAY', color: 2, font: 2, wall: 1, effect: 4, size: 70, glow: 75 },
+  { name: '💜 Vibe',     text: 'good\nvibes', color: 6, font: 3, wall: 1, effect: 0, size: 100, glow: 60 },
+  { name: '🔴 Danger',   text: 'EXIT', color: 5, font: 5, wall: 2, effect: 5, size: 80, glow: 80 },
+  { name: '🌊 Ocean',    text: 'WAVES', color: 7, font: 5, wall: 1, effect: 4, size: 72, glow: 65 },
+];
+
+let state = {
+  text: 'OPEN',
+  colorIdx: 0,
+  fontIdx: 0,
+  wallIdx: 0,
+  effectIdx: 0,
+  size: 72,
+  glow: 60,
+  spacing: 2,
+  power: true,
+  drawing: false,
+};
+
+const wall = document.getElementById('wall');
+const neonText = document.getElementById('neon-text');
+const neonContainer = document.getElementById('neon-container');
+const wallGlow = document.getElementById('wall-glow');
+const textInput = document.getElementById('text-input');
+const canvas = document.getElementById('draw-canvas');
+const ctx = canvas.getContext('2d');
+
+function buildColorGrid() {
+  const grid = document.getElementById('color-grid');
+  grid.innerHTML = '';
+  COLORS.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'color-btn' + (i === state.colorIdx ? ' active' : '');
+    btn.style.background = `radial-gradient(circle, ${c.hex}, ${c.hex}88 60%, ${c.hex}33)`;
+    btn.style.boxShadow = `0 0 12px ${c.hex}66`;
+    btn.title = c.name;
+    btn.onclick = () => { state.colorIdx = i; render(); };
+    grid.appendChild(btn);
+  });
+}
+
+function buildFontGrid() {
+  const grid = document.getElementById('font-grid');
+  grid.innerHTML = '';
+  FONTS.forEach((f, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'font-btn' + (i === state.fontIdx ? ' active' : '');
+    btn.textContent = f.name;
+    btn.style.fontFamily = f.family;
+    btn.onclick = () => { state.fontIdx = i; render(); };
+    grid.appendChild(btn);
+  });
+}
+
+function buildWallGrid() {
+  const grid = document.getElementById('wall-grid');
+  grid.innerHTML = '';
+  WALLS.forEach((w, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'wall-btn' + (i === state.wallIdx ? ' active' : '');
+    btn.style.background = w.bg;
+    btn.textContent = w.name;
+    btn.onclick = () => { state.wallIdx = i; render(); };
+    grid.appendChild(btn);
+  });
+}
+
+function buildEffectGrid() {
+  const grid = document.getElementById('effect-grid');
+  grid.innerHTML = '';
+  EFFECTS.forEach((e, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'effect-btn' + (i === state.effectIdx ? ' active' : '');
+    btn.textContent = e.name;
+    btn.onclick = () => { state.effectIdx = i; render(); };
+    grid.appendChild(btn);
+  });
+}
+
+function buildPresets() {
+  const row = document.getElementById('presets-row');
+  row.innerHTML = '';
+  PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = p.name;
+    btn.onclick = () => {
+      state.text = p.text;
+      state.colorIdx = p.color;
+      state.fontIdx = p.font;
+      state.wallIdx = p.wall;
+      state.effectIdx = p.effect;
+      state.size = p.size;
+      state.glow = p.glow;
+      state.power = true;
+      textInput.value = p.text;
+      document.getElementById('size-slider').value = p.size;
+      document.getElementById('glow-slider').value = p.glow;
+      render();
+    };
+    row.appendChild(btn);
+  });
+}
+
+function render() {
+  const color = COLORS[state.colorIdx];
+  const font = FONTS[state.fontIdx];
+  const wallStyle = WALLS[state.wallIdx];
+
+  neonText.textContent = state.text || ' ';
+  neonText.style.fontFamily = font.family;
+  neonText.style.fontSize = state.size + 'px';
+  neonText.style.letterSpacing = state.spacing + 'px';
+  neonText.style.color = color.hex;
+
+  const g = state.glow / 100;
+  const s1 = Math.round(10 * g);
+  const s2 = Math.round(20 * g);
+  const s3 = Math.round(40 * g);
+  const s4 = Math.round(80 * g);
+  neonText.style.textShadow = `
+    0 0 ${s1}px ${color.hex},
+    0 0 ${s2}px ${color.hex},
+    0 0 ${s3}px ${color.glow}aa,
+    0 0 ${s4}px ${color.glow}66
+  `;
+
+  wallGlow.style.background = `radial-gradient(ellipse, ${color.bg}, transparent 70%)`;
+
+  wall.className = wallStyle.cls;
+  if (!state.power) neonContainer.classList.add('neon-off');
+  else neonContainer.classList.remove('neon-off');
+  if (state.drawing) wall.classList.add('draw-active');
+  else wall.classList.remove('draw-active');
+
+  buildColorGrid();
+  buildFontGrid();
+  buildWallGrid();
+  buildEffectGrid();
+
+  document.getElementById('size-val').textContent = state.size;
+  document.getElementById('glow-val').textContent = state.glow;
+  document.getElementById('spacing-val').textContent = state.spacing;
+
+  const powerBtn = document.getElementById('power-btn');
+  if (state.power) {
+    powerBtn.innerHTML = '<div class="dot"></div><span>ON</span>';
+    powerBtn.classList.remove('power-off');
+  } else {
+    powerBtn.innerHTML = '<div class="dot"></div><span>OFF</span>';
+    powerBtn.classList.add('power-off');
+  }
+
+  const drawBtn = document.getElementById('draw-btn');
+  if (state.drawing) drawBtn.classList.add('active');
+  else drawBtn.classList.remove('active');
+}
+
+let flickerFrame;
+function runFlicker() {
+  cancelAnimationFrame(flickerFrame);
+  const effect = EFFECTS[state.effectIdx].id;
+  if (effect === 'steady' || !state.power) return;
+
+  let lastTime = 0;
+  function tick(time) {
+    if (!state.power) return;
+    const dt = time - lastTime;
+    let opacity = 1;
+
+    if (effect === 'subtle') {
+      opacity = 0.92 + Math.random() * 0.08;
+    } else if (effect === 'buzz') {
+      opacity = 0.85 + Math.random() * 0.15;
+      if (Math.random() < 0.03) opacity = 0.6;
+    } else if (effect === 'flicker') {
+      if (Math.random() < 0.06) opacity = 0.2 + Math.random() * 0.3;
+      else if (Math.random() < 0.15) opacity = 0.7 + Math.random() * 0.3;
+    } else if (effect === 'pulse') {
+      opacity = 0.7 + 0.3 * Math.sin(time * 0.003);
+    } else if (effect === 'dying') {
+      opacity = 0.3 + 0.4 * Math.random();
+      if (Math.random() < 0.08) opacity = 0;
+      if (Math.random() < 0.02) opacity = 1;
+    }
+
+    neonText.style.opacity = opacity;
+    const glowMult = opacity;
+    wallGlow.style.opacity = 0.15 * glowMult;
+    lastTime = time;
+    flickerFrame = requestAnimationFrame(tick);
+  }
+  flickerFrame = requestAnimationFrame(tick);
+}
+
+textInput.addEventListener('input', () => {
+  state.text = textInput.value;
+  neonText.textContent = state.text || ' ';
+});
+
+document.getElementById('size-slider').addEventListener('input', e => {
+  state.size = parseInt(e.target.value);
+  neonText.style.fontSize = state.size + 'px';
+  document.getElementById('size-val').textContent = state.size;
+});
+
+document.getElementById('glow-slider').addEventListener('input', e => {
+  state.glow = parseInt(e.target.value);
+  render();
+});
+
+document.getElementById('spacing-slider').addEventListener('input', e => {
+  state.spacing = parseInt(e.target.value);
+  neonText.style.letterSpacing = state.spacing + 'px';
+  document.getElementById('spacing-val').textContent = state.spacing;
+});
+
+document.getElementById('power-btn').addEventListener('click', () => {
+  state.power = !state.power;
+  render();
+  if (state.power) runFlicker();
+});
+
+document.getElementById('draw-btn').addEventListener('click', () => {
+  state.drawing = !state.drawing;
+  render();
+  if (state.drawing) resizeCanvas();
+});
+
+document.getElementById('clear-draw-btn').addEventListener('click', () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawPaths = [];
+});
+
+document.getElementById('screenshot-btn').addEventListener('click', () => {
+  const wasDrawing = state.drawing;
+  state.drawing = false;
+  render();
+
+  const el = wall;
+  const rect = el.getBoundingClientRect();
+
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = rect.width * 2;
+  tmpCanvas.height = rect.height * 2;
+  const tCtx = tmpCanvas.getContext('2d');
+  tCtx.scale(2, 2);
+
+  const wallStyle = WALLS[state.wallIdx];
+  tCtx.fillStyle = wallStyle.bg;
+  tCtx.fillRect(0, 0, rect.width, rect.height);
+
+  const color = COLORS[state.colorIdx];
+  const g = state.glow / 100;
+  const gradient = tCtx.createRadialGradient(
+    rect.width/2, rect.height/2, 0,
+    rect.width/2, rect.height/2, rect.width * 0.5
+  );
+  gradient.addColorStop(0, color.bg);
+  gradient.addColorStop(1, 'transparent');
+  tCtx.fillStyle = gradient;
+  tCtx.globalAlpha = state.power ? 0.3 : 0;
+  tCtx.fillRect(0, 0, rect.width, rect.height);
+  tCtx.globalAlpha = 1;
+
+  const font = FONTS[state.fontIdx];
+  tCtx.font = `${state.size}px ${font.family.replace(/'/g, '')}`;
+  tCtx.textAlign = 'center';
+  tCtx.textBaseline = 'middle';
+  tCtx.letterSpacing = state.spacing + 'px';
+
+  if (state.power) {
+    tCtx.shadowColor = color.glow;
+    tCtx.shadowBlur = 40 * g;
+    tCtx.fillStyle = color.hex;
+  } else {
+    tCtx.fillStyle = color.hex + '33';
+  }
+
+  const lines = state.text.split('\n');
+  const lineHeight = state.size * 1.3;
+  const totalHeight = lines.length * lineHeight;
+  const startY = (rect.height - totalHeight) / 2 + lineHeight / 2;
+
+  lines.forEach((line, i) => {
+    if (state.power) {
+      tCtx.shadowBlur = 80 * g;
+      tCtx.fillText(line, rect.width / 2, startY + i * lineHeight);
+      tCtx.shadowBlur = 40 * g;
+      tCtx.fillText(line, rect.width / 2, startY + i * lineHeight);
+      tCtx.shadowBlur = 10 * g;
+      tCtx.fillText(line, rect.width / 2, startY + i * lineHeight);
+    } else {
+      tCtx.fillText(line, rect.width / 2, startY + i * lineHeight);
+    }
+  });
+
+  if (drawPaths.length > 0) {
+    tCtx.shadowColor = color.glow;
+    tCtx.shadowBlur = 20 * g;
+    tCtx.strokeStyle = color.hex;
+    tCtx.lineWidth = 3;
+    tCtx.lineCap = 'round';
+    tCtx.lineJoin = 'round';
+    drawPaths.forEach(path => {
+      if (path.length < 2) return;
+      tCtx.beginPath();
+      tCtx.moveTo(path[0].x, path[0].y);
+      for (let i = 1; i < path.length; i++) {
+        tCtx.lineTo(path[i].x, path[i].y);
+      }
+      tCtx.stroke();
+    });
+  }
+
+  const link = document.createElement('a');
+  link.download = 'neon-sign.png';
+  link.href = tmpCanvas.toDataURL();
+  link.click();
+
+  state.drawing = wasDrawing;
+  render();
+});
+
+let drawPaths = [];
+let currentPath = null;
+let isDrawing = false;
+
+function resizeCanvas() {
+  const rect = wall.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  redrawPaths();
+}
+
+function redrawPaths() {
+  const color = COLORS[state.colorIdx];
+  const g = state.glow / 100;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = color.hex;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = color.glow;
+  ctx.shadowBlur = 20 * g;
+
+  drawPaths.forEach(path => {
+    if (path.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i = 1; i < path.length; i++) {
+      thinLine(ctx, path[i-1], path[i]);
+    }
+    ctx.stroke();
+  });
+}
+
+function thinLine(c, from, to) {
+  c.lineTo(to.x, to.y);
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (!state.drawing) return;
+  isDrawing = true;
+  currentPath = [getPos(e)];
+  drawPaths.push(currentPath);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!isDrawing || !state.drawing) return;
+  currentPath.push(getPos(e));
+  redrawPaths();
+});
+
+canvas.addEventListener('mouseup', () => { isDrawing = false; });
+canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+
+canvas.addEventListener('touchstart', e => {
+  if (!state.drawing) return;
+  e.preventDefault();
+  isDrawing = true;
+  currentPath = [getPos(e)];
+  drawPaths.push(currentPath);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  if (!isDrawing || !state.drawing) return;
+  e.preventDefault();
+  currentPath.push(getPos(e));
+  redrawPaths();
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+let dragOffset = null;
+neonContainer.addEventListener('mousedown', e => {
+  if (state.drawing) return;
+  const rect = neonContainer.getBoundingClientRect();
+  dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+});
+
+document.addEventListener('mousemove', e => {
+  if (!dragOffset || state.drawing) return;
+  const wallRect = wall.getBoundingClientRect();
+  neonContainer.style.position = 'absolute';
+  neonContainer.style.left = (e.clientX - wallRect.left - dragOffset.x) + 'px';
+  neonContainer.style.top = (e.clientY - wallRect.top - dragOffset.y) + 'px';
+  neonContainer.style.transform = 'none';
+});
+
+document.addEventListener('mouseup', () => { dragOffset = null; });
+
+window.addEventListener('resize', () => {
+  if (state.drawing) resizeCanvas();
+});
+
+const flickerObserver = new MutationObserver(() => {
+  cancelAnimationFrame(flickerFrame);
+  if (state.power) runFlicker();
+});
+
+buildColorGrid();
+buildFontGrid();
+buildWallGrid();
+buildEffectGrid();
+buildPresets();
+render();
+runFlicker();
+
+setInterval(() => {
+  if (state.power && state.effectIdx !== 0) {
+    cancelAnimationFrame(flickerFrame);
+    runFlicker();
+  }
+}, 5000);
+</script>
+</body>
+</html>
