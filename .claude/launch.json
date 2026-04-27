@@ -120,6 +120,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "tidal-pool-ecosystem", "-l", "3475"],
       "port": 3475
+    },
+    {
+      "name": "zen-garden",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "zen-garden", "-l", "3476"],
+      "port": 3476
     }
   ]
 }
