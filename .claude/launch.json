@@ -132,6 +132,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "neon-sign-workshop", "-l", "3477"],
       "port": 3477
+    },
+    {
+      "name": "topographic-map-generator",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "topographic-map-generator", "-l", "3478"],
+      "port": 3478
     }
   ]
 }

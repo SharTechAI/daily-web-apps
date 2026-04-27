@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snowflake Generator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #050a14;
+  color: #c8ddf0;
+  font-family: 'Inter', system-ui, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+}
+
+canvas {
+  display: block;
+}
+
+#bgCanvas {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 0;
+}
+
+#mainCanvas {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 1;
+}
+
+.controls {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  z-index: 10;
+  background: rgba(8, 16, 32, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(100, 160, 220, 0.15);
+  border-radius: 16px;
+  padding: 24px;
+  width: 280px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100,160,220,0.2) transparent;
+}
+
+.controls h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #7ec8f0, #a0d4f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-group {
+  margin-bottom: 16px;
+}
+
+.control-group label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #8aa8c4;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.control-group label span {
+  color: #7ec8f0;
+  font-weight: 600;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(100, 160, 220, 0.15);
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #7ec8f0, #5aa0d0);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(126, 200, 240, 0.4);
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+button {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid rgba(100, 160, 220, 0.2);
+  border-radius: 10px;
+  background: rgba(100, 160, 220, 0.08);
+  color: #a0c8e0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+button:hover {
+  background: rgba(100, 160, 220, 0.18);
+  border-color: rgba(100, 160, 220, 0.35);
+  color: #c8e8ff;
+}
+
+button.primary {
+  background: linear-gradient(135deg, rgba(100, 180, 240, 0.2), rgba(80, 140, 200, 0.2));
+  border-color: rgba(100, 180, 240, 0.35);
+  color: #b0dcf8;
+}
+
+button.primary:hover {
+  background: linear-gradient(135deg, rgba(100, 180, 240, 0.35), rgba(80, 140, 200, 0.35));
+}
+
+.presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.preset-btn {
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.gallery-item {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 160, 220, 0.12);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.gallery-item:hover {
+  border-color: rgba(100, 180, 240, 0.4);
+  transform: scale(1.05);
+}
+
+.gallery-item canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-item .delete-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(200, 60, 60, 0.8);
+  border: none;
+  color: #fff;
+  font-size: 0.55rem;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+
+.gallery-item:hover .delete-btn {
+  display: flex;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(100, 160, 220, 0.1);
+  margin: 16px 0;
+}
+
+.section-label {
+  font-size: 0.7rem;
+  color: #6090b0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.color-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.color-swatch.active {
+  border-color: #fff;
+  transform: scale(1.15);
+  box-shadow: 0 0 12px rgba(126, 200, 240, 0.5);
+}
+
+.speed-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #6090b0;
+  margin-bottom: 8px;
+}
+
+.speed-indicator .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4adc8a;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.info-text {
+  font-size: 0.7rem;
+  color: #506880;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<canvas id="mainCanvas"></canvas>
+
+<div class="controls">
+  <h2>&#10052; Snowflake Generator</h2>
+
+  <div class="speed-indicator">
+    <div class="dot"></div>
+    <span id="statusText">Growing...</span>
+  </div>
+
+  <div class="btn-row">
+    <button class="primary" onclick="generateNew()">New Flake</button>
+    <button onclick="saveToGallery()">Save</button>
+    <button onclick="exportPNG()">Export</button>
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-label">Presets</div>
+  <div class="presets">
+    <button class="preset-btn" onclick="applyPreset('stellar')">Stellar Dendrite</button>
+    <button class="preset-btn" onclick="applyPreset('plate')">Plate Crystal</button>
+    <button class="preset-btn" onclick="applyPreset('fernlike')">Fernlike</button>
+    <button class="preset-btn" onclick="applyPreset('needle')">Ice Needle</button>
+    <button class="preset-btn" onclick="applyPreset('column')">Column</button>
+    <button class="preset-btn" onclick="applyPreset('rosette')">Rosette</button>
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-label">Crystal Parameters</div>
+
+  <div class="control-group">
+    <label>Branch Count <span id="branchVal">6</span></label>
+    <input type="range" id="branches" min="3" max="12" value="6" step="1">
+  </div>
+
+  <div class="control-group">
+    <label>Complexity <span id="complexityVal">7</span></label>
+    <input type="range" id="complexity" min="1" max="12" value="7" step="1">
+  </div>
+
+  <div class="control-group">
+    <label>Branch Angle <span id="angleVal">30</span>&deg;</label>
+    <input type="range" id="angle" min="10" max="70" value="30" step="1">
+  </div>
+
+  <div class="control-group">
+    <label>Randomness <span id="randomVal">20</span>%</label>
+    <input type="range" id="randomness" min="0" max="60" value="20" step="1">
+  </div>
+
+  <div class="control-group">
+    <label>Branch Width <span id="widthVal">3</span></label>
+    <input type="range" id="branchWidth" min="1" max="6" value="3" step="0.5">
+  </div>
+
+  <div class="control-group">
+    <label>Growth Speed <span id="speedVal">3</span></label>
+    <input type="range" id="speed" min="1" max="5" value="3" step="1">
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-label">Color Theme</div>
+  <div class="color-row" id="colorRow"></div>
+
+  <div class="divider"></div>
+  <div class="section-label">Gallery</div>
+  <div class="gallery" id="gallery"></div>
+
+  <div class="info-text">
+    Each snowflake grows with 6-fold symmetry using fractal branching. Adjust parameters and hit "New Flake" to generate unique crystals.
+  </div>
+</div>
+
+<script>
+const bgCanvas = document.getElementById('bgCanvas');
+const bgCtx = bgCanvas.getContext('2d');
+const mainCanvas = document.getElementById('mainCanvas');
+const ctx = mainCanvas.getContext('2d');
+
+const colorThemes = [
+  { name: 'Ice Blue', colors: ['#7ec8f0', '#a0dcff', '#c0eaff', '#5aa8d8'], bg: '#050a14' },
+  { name: 'Arctic', colors: ['#b0e0ff', '#d0f0ff', '#e8f8ff', '#80c0e0'], bg: '#040810' },
+  { name: 'Crystal', colors: ['#c0b0ff', '#d8c8ff', '#e8e0ff', '#a090e0'], bg: '#0a0818' },
+  { name: 'Aurora', colors: ['#60e8b0', '#80f0c8', '#a0f8e0', '#40d098'], bg: '#040e0a' },
+  { name: 'Rose', colors: ['#f0a0c0', '#f8c0d8', '#ffd8e8', '#e080a0'], bg: '#100610' },
+  { name: 'Gold', colors: ['#f0d080', '#f8e0a0', '#ffe8b8', '#d8b060'], bg: '#100a04' },
+  { name: 'White', colors: ['#e0e8f0', '#eef2f8', '#f8faff', '#c8d0e0'], bg: '#060810' },
+];
+
+let currentTheme = 0;
+let gallery = [];
+let snowflake = null;
+let growthProgress = 0;
+let animFrame = null;
+let bgSnowflakes = [];
+
+function resize() {
+  bgCanvas.width = mainCanvas.width = window.innerWidth;
+  bgCanvas.height = mainCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', () => { resize(); drawBg(); });
+resize();
+
+function initColorRow() {
+  const row = document.getElementById('colorRow');
+  row.innerHTML = '';
+  colorThemes.forEach((theme, i) => {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (i === currentTheme ? ' active' : '');
+    swatch.style.background = `linear-gradient(135deg, ${theme.colors[0]}, ${theme.colors[2]})`;
+    swatch.title = theme.name;
+    swatch.onclick = () => {
+      currentTheme = i;
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+      document.body.style.background = theme.bg;
+      generateNew();
+    };
+    row.appendChild(swatch);
+  });
+}
+
+function getParam(id) { return parseFloat(document.getElementById(id).value); }
+
+const sliders = ['branches', 'complexity', 'angle', 'randomness', 'branchWidth', 'speed'];
+sliders.forEach(id => {
+  document.getElementById(id).addEventListener('input', (e) => {
+    document.getElementById(id + 'Val').textContent = e.target.value;
+  });
+});
+
+class SnowflakeBranch {
+  constructor(x, y, angle, length, width, depth, maxDepth, params) {
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.length = length;
+    this.width = width;
+    this.depth = depth;
+    this.maxDepth = maxDepth;
+    this.params = params;
+    this.grown = 0;
+    this.children = [];
+    this.spawned = false;
+    this.endX = x + Math.cos(angle) * length;
+    this.endY = y + Math.sin(angle) * length;
+  }
+
+  grow(dt) {
+    if (this.grown < 1) {
+      this.grown = Math.min(1, this.grown + dt);
+    }
+    if (this.grown > 0.4 && !this.spawned && this.depth < this.maxDepth) {
+      this.spawnChildren();
+      this.spawned = true;
+    }
+    this.children.forEach(c => {
+      if (this.grown > 0.5) c.grow(dt * 0.85);
+    });
+  }
+
+  spawnChildren() {
+    const { branchAngle, randomness, complexity } = this.params;
+    const childLen = this.length * (0.5 + Math.random() * 0.2);
+    const childWidth = this.width * 0.7;
+    const rand = () => (Math.random() - 0.5) * randomness * 0.02;
+
+    const numSub = Math.max(1, Math.floor(complexity / 3));
+    for (let i = 0; i < numSub; i++) {
+      const t = 0.3 + (i / numSub) * 0.5;
+      const bx = this.x + (this.endX - this.x) * t;
+      const by = this.y + (this.endY - this.y) * t;
+      const len = childLen * (1 - t * 0.4) * (0.7 + Math.random() * 0.3);
+
+      this.children.push(new SnowflakeBranch(
+        bx, by, this.angle - branchAngle + rand(), len, childWidth,
+        this.depth + 1, this.maxDepth, this.params
+      ));
+      this.children.push(new SnowflakeBranch(
+        bx, by, this.angle + branchAngle + rand(), len, childWidth,
+        this.depth + 1, this.maxDepth, this.params
+      ));
+    }
+
+    if (complexity > 5 && this.depth < this.maxDepth - 1) {
+      const tipLen = childLen * 0.6;
+      this.children.push(new SnowflakeBranch(
+        this.endX, this.endY, this.angle + rand(), tipLen, childWidth * 0.8,
+        this.depth + 1, this.maxDepth, this.params
+      ));
+    }
+  }
+
+  draw(ctx, theme, alpha) {
+    if (this.grown <= 0) return;
+    const progress = this.grown;
+    const cx = this.x + (this.endX - this.x) * progress;
+    const cy = this.y + (this.endY - this.y) * progress;
+
+    const colors = theme.colors;
+    const colorIdx = Math.min(this.depth, colors.length - 1);
+
+    ctx.save();
+    ctx.globalAlpha = alpha * (0.6 + progress * 0.4);
+    ctx.strokeStyle = colors[colorIdx];
+    ctx.lineWidth = this.width * (1 + (1 - this.depth / this.maxDepth) * 0.5);
+    ctx.lineCap = 'round';
+    ctx.shadowColor = colors[0];
+    ctx.shadowBlur = 4 + this.width * 2;
+
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+
+    if (this.depth === 0 && progress > 0.3) {
+      ctx.globalAlpha = alpha * 0.15;
+      ctx.lineWidth = this.width * 3;
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    this.children.forEach(c => c.draw(ctx, theme, alpha));
+  }
+
+  isComplete() {
+    if (this.grown < 1) return false;
+    return this.children.every(c => c.isComplete());
+  }
+}
+
+class Snowflake {
+  constructor(cx, cy, radius, params) {
+    this.cx = cx;
+    this.cy = cy;
+    this.radius = radius;
+    this.params = params;
+    this.arms = [];
+    this.rotation = 0;
+
+    const { branches, complexity, branchAngle, randomness, branchWidth } = params;
+    const maxDepth = Math.min(complexity, 6);
+
+    for (let i = 0; i < branches; i++) {
+      const angle = (Math.PI * 2 / branches) * i - Math.PI / 2;
+      const arm = new SnowflakeBranch(
+        cx, cy, angle, radius, branchWidth, 0, maxDepth, {
+          branchAngle: branchAngle * Math.PI / 180,
+          randomness,
+          complexity
+        }
+      );
+      this.arms.push(arm);
+    }
+  }
+
+  grow(dt) {
+    this.rotation += dt * 0.02;
+    this.arms.forEach(a => a.grow(dt));
+  }
+
+  draw(ctx, theme) {
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+    ctx.rotate(this.rotation);
+    ctx.translate(-this.cx, -this.cy);
+
+    this.drawCenterGlow(ctx, theme);
+    this.arms.forEach(a => a.draw(ctx, theme, 1));
+
+    ctx.restore();
+  }
+
+  drawCenterGlow(ctx, theme) {
+    const grad = ctx.createRadialGradient(this.cx, this.cy, 0, this.cx, this.cy, 20);
+    grad.addColorStop(0, theme.colors[2] + '40');
+    grad.addColorStop(0.5, theme.colors[0] + '15');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(this.cx, this.cy, 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = theme.colors[2];
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.arc(this.cx, this.cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  isComplete() {
+    return this.arms.every(a => a.isComplete());
+  }
+}
+
+function initBgSnowflakes() {
+  bgSnowflakes = [];
+  for (let i = 0; i < 60; i++) {
+    bgSnowflakes.push({
+      x: Math.random() * mainCanvas.width,
+      y: Math.random() * mainCanvas.height,
+      size: 1 + Math.random() * 3,
+      speed: 0.2 + Math.random() * 0.8,
+      drift: (Math.random() - 0.5) * 0.5,
+      opacity: 0.1 + Math.random() * 0.3,
+      twinkle: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function drawBg() {
+  const theme = colorThemes[currentTheme];
+  bgCtx.fillStyle = theme.bg;
+  bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+  const cx = bgCanvas.width / 2;
+  const cy = bgCanvas.height / 2;
+  const grad = bgCtx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(cx, cy));
+  grad.addColorStop(0, theme.colors[0] + '08');
+  grad.addColorStop(0.5, theme.colors[0] + '03');
+  grad.addColorStop(1, 'transparent');
+  bgCtx.fillStyle = grad;
+  bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+}
+
+function updateBgSnow(dt) {
+  bgSnowflakes.forEach(s => {
+    s.y += s.speed * dt * 30;
+    s.x += s.drift * dt * 30;
+    s.twinkle += dt * 2;
+    if (s.y > mainCanvas.height + 10) {
+      s.y = -10;
+      s.x = Math.random() * mainCanvas.width;
+    }
+    if (s.x < -10) s.x = mainCanvas.width + 10;
+    if (s.x > mainCanvas.width + 10) s.x = -10;
+  });
+}
+
+function drawBgSnow() {
+  const theme = colorThemes[currentTheme];
+  bgSnowflakes.forEach(s => {
+    const twinkleAlpha = 0.5 + Math.sin(s.twinkle) * 0.5;
+    bgCtx.globalAlpha = s.opacity * twinkleAlpha;
+    bgCtx.fillStyle = theme.colors[2];
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    bgCtx.fill();
+  });
+  bgCtx.globalAlpha = 1;
+}
+
+function generateNew() {
+  const params = {
+    branches: getParam('branches'),
+    complexity: getParam('complexity'),
+    branchAngle: getParam('angle'),
+    randomness: getParam('randomness'),
+    branchWidth: getParam('branchWidth'),
+    speed: getParam('speed')
+  };
+
+  const cx = mainCanvas.width / 2;
+  const cy = mainCanvas.height / 2;
+  const radius = Math.min(cx, cy) * 0.55;
+
+  snowflake = new Snowflake(cx, cy, radius, params);
+  growthProgress = 0;
+  document.getElementById('statusText').textContent = 'Growing...';
+}
+
+let lastTime = performance.now();
+
+function animate(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+
+  drawBg();
+  updateBgSnow(dt);
+  drawBgSnow();
+
+  ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+
+  if (snowflake) {
+    const speedMult = [0.3, 0.6, 1, 1.8, 3][Math.floor(getParam('speed')) - 1] || 1;
+    snowflake.grow(dt * speedMult);
+    snowflake.draw(ctx, colorThemes[currentTheme]);
+
+    if (snowflake.isComplete()) {
+      document.getElementById('statusText').textContent = 'Complete';
+    }
+  }
+
+  animFrame = requestAnimationFrame(animate);
+}
+
+function saveToGallery() {
+  if (!snowflake) return;
+
+  const thumb = document.createElement('canvas');
+  thumb.width = 120;
+  thumb.height = 120;
+  const tCtx = thumb.getContext('2d');
+  const theme = colorThemes[currentTheme];
+
+  tCtx.fillStyle = theme.bg;
+  tCtx.fillRect(0, 0, 120, 120);
+
+  tCtx.save();
+  const scale = 120 / Math.min(mainCanvas.width, mainCanvas.height);
+  tCtx.translate(60, 60);
+  tCtx.scale(scale, scale);
+  tCtx.translate(-mainCanvas.width / 2, -mainCanvas.height / 2);
+
+  snowflake.draw(tCtx, theme);
+  tCtx.restore();
+
+  gallery.unshift({ canvas: thumb, theme: currentTheme });
+  if (gallery.length > 12) gallery.pop();
+  renderGallery();
+}
+
+function renderGallery() {
+  const container = document.getElementById('gallery');
+  container.innerHTML = '';
+  gallery.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'gallery-item';
+    div.appendChild(item.canvas);
+
+    const del = document.createElement('button');
+    del.className = 'delete-btn';
+    del.textContent = '×';
+    del.onclick = (e) => {
+      e.stopPropagation();
+      gallery.splice(idx, 1);
+      renderGallery();
+    };
+    div.appendChild(del);
+    container.appendChild(div);
+  });
+}
+
+function exportPNG() {
+  if (!snowflake) return;
+
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = 2048;
+  exportCanvas.height = 2048;
+  const eCtx = exportCanvas.getContext('2d');
+  const theme = colorThemes[currentTheme];
+
+  eCtx.fillStyle = theme.bg;
+  eCtx.fillRect(0, 0, 2048, 2048);
+
+  eCtx.save();
+  const scale = 2048 / Math.min(mainCanvas.width, mainCanvas.height);
+  eCtx.translate(1024, 1024);
+  eCtx.scale(scale, scale);
+  eCtx.translate(-mainCanvas.width / 2, -mainCanvas.height / 2);
+  snowflake.draw(eCtx, theme);
+  eCtx.restore();
+
+  const link = document.createElement('a');
+  link.download = 'snowflake-' + Date.now() + '.png';
+  link.href = exportCanvas.toDataURL('image/png');
+  link.click();
+}
+
+const presets = {
+  stellar: { branches: 6, complexity: 8, angle: 30, randomness: 15, branchWidth: 2.5, speed: 3 },
+  plate: { branches: 6, complexity: 3, angle: 60, randomness: 5, branchWidth: 4, speed: 3 },
+  fernlike: { branches: 6, complexity: 10, angle: 25, randomness: 25, branchWidth: 2, speed: 2 },
+  needle: { branches: 6, complexity: 4, angle: 15, randomness: 10, branchWidth: 1.5, speed: 4 },
+  column: { branches: 8, complexity: 5, angle: 45, randomness: 8, branchWidth: 3.5, speed: 3 },
+  rosette: { branches: 12, complexity: 6, angle: 35, randomness: 20, branchWidth: 2, speed: 3 }
+};
+
+function applyPreset(name) {
+  const p = presets[name];
+  Object.keys(p).forEach(key => {
+    const el = document.getElementById(key);
+    if (el) {
+      el.value = p[key];
+      const valEl = document.getElementById(key + 'Val');
+      if (valEl) valEl.textContent = p[key];
+    }
+  });
+  generateNew();
+}
+
+initColorRow();
+initBgSnowflakes();
+drawBg();
+generateNew();
+animate(performance.now());
+</script>
+</body>
+</html>
