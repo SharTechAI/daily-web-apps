@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lightning Storm Generator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; }
+  canvas { display: block; cursor: crosshair; }
+
+  #flash-overlay {
+    position: fixed; inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+    transition: opacity 0.05s;
+  }
+
+  .controls {
+    position: fixed; top: 16px; right: 16px;
+    background: rgba(10,10,18,0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(120,130,255,0.15);
+    border-radius: 14px;
+    padding: 18px 20px;
+    z-index: 10;
+    width: 260px;
+    color: #c0c4e0;
+    font-size: 0.78rem;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  .controls h2 {
+    font-size: 0.9rem;
+    color: #e0e4ff;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .controls label {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; font-size: 0.75rem;
+  }
+  .controls label span { color: #8888aa; }
+  .controls input[type="range"] {
+    width: 100%; height: 4px; -webkit-appearance: none; appearance: none;
+    background: rgba(120,130,255,0.15); border-radius: 2px; outline: none;
+    margin-bottom: 12px;
+  }
+  .controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: #7c6ff7; border-radius: 50%; cursor: pointer;
+  }
+  .preset-row {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .preset-btn {
+    background: rgba(120,130,255,0.1);
+    border: 1px solid rgba(120,130,255,0.2);
+    color: #b0b4e0; border-radius: 8px;
+    padding: 5px 10px; font-size: 0.7rem;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    background: rgba(124,111,247,0.3);
+    border-color: #7c6ff7; color: #e0e4ff;
+  }
+  .section-label {
+    color: #6668a0; font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 0.8px; margin: 10px 0 8px; font-weight: 600;
+  }
+  .toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .toggle {
+    width: 36px; height: 20px; background: rgba(120,130,255,0.15);
+    border-radius: 10px; position: relative; cursor: pointer; transition: 0.2s;
+  }
+  .toggle.on { background: rgba(124,111,247,0.5); }
+  .toggle::after {
+    content: ''; position: absolute; width: 16px; height: 16px;
+    background: #7c6ff7; border-radius: 50%; top: 2px; left: 2px;
+    transition: 0.2s;
+  }
+  .toggle.on::after { left: 18px; }
+  .hint {
+    text-align: center; color: #5558a0; font-size: 0.72rem;
+    margin-top: 10px; line-height: 1.5;
+  }
+
+  .title-overlay {
+    position: fixed; top: 16px; left: 16px; z-index: 10;
+    color: #c0c4e0;
+  }
+  .title-overlay h1 {
+    font-size: 1.1rem; color: #e0e4ff; font-weight: 700;
+    text-shadow: 0 0 20px rgba(124,111,247,0.4);
+  }
+  .title-overlay p {
+    font-size: 0.72rem; color: #6668a0; margin-top: 4px;
+  }
+  .stats {
+    position: fixed; bottom: 16px; left: 16px; z-index: 10;
+    color: #5558a0; font-size: 0.68rem;
+  }
+
+  @media (max-width: 700px) {
+    .controls { width: 220px; right: 8px; top: 8px; padding: 14px; }
+    .title-overlay { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="flash-overlay"></div>
+
+<div class="title-overlay">
+  <h1>Lightning Storm Generator</h1>
+  <p>Click or tap anywhere to summon lightning</p>
+</div>
+
+<div class="controls">
+  <h2>⛈ Storm Controls</h2>
+
+  <div class="section-label">Presets</div>
+  <div class="preset-row">
+    <button class="preset-btn active" data-preset="summer">Summer</button>
+    <button class="preset-btn" data-preset="supercell">Supercell</button>
+    <button class="preset-btn" data-preset="arctic">Arctic</button>
+    <button class="preset-btn" data-preset="volcanic">Volcanic</button>
+    <button class="preset-btn" data-preset="alien">Alien</button>
+    <button class="preset-btn" data-preset="heat">Heat</button>
+  </div>
+
+  <div class="section-label">Lightning</div>
+  <label>Branch Depth <span id="v-depth">6</span></label>
+  <input type="range" id="branch-depth" min="2" max="10" value="6">
+  <label>Branch Spread <span id="v-spread">0.5</span></label>
+  <input type="range" id="branch-spread" min="0" max="100" value="50">
+  <label>Bolt Thickness <span id="v-thick">2.5</span></label>
+  <input type="range" id="bolt-thick" min="5" max="60" value="25">
+  <label>Glow Intensity <span id="v-glow">0.7</span></label>
+  <input type="range" id="glow-intensity" min="0" max="100" value="70">
+
+  <div class="section-label">Storm</div>
+  <label>Rain Intensity <span id="v-rain">0.6</span></label>
+  <input type="range" id="rain-intensity" min="0" max="100" value="60">
+  <label>Wind <span id="v-wind">0.3</span></label>
+  <input type="range" id="wind" min="0" max="100" value="30">
+  <label>Cloud Darkness <span id="v-cloud">0.6</span></label>
+  <input type="range" id="cloud-dark" min="0" max="100" value="60">
+
+  <div class="section-label">Color</div>
+  <label>Hue <span id="v-hue">230</span></label>
+  <input type="range" id="bolt-hue" min="0" max="360" value="230">
+  <label>Saturation <span id="v-sat">0.6</span></label>
+  <input type="range" id="bolt-sat" min="0" max="100" value="60">
+
+  <div class="section-label">Options</div>
+  <div class="toggle-row">
+    <span>Thunder Sound</span>
+    <div class="toggle on" id="toggle-thunder"></div>
+  </div>
+  <div class="toggle-row">
+    <span>Screen Flash</span>
+    <div class="toggle on" id="toggle-flash"></div>
+  </div>
+  <div class="toggle-row">
+    <span>Auto Strikes</span>
+    <div class="toggle on" id="toggle-auto"></div>
+  </div>
+
+  <div class="hint">Click sky to summon bolts<br>Hold for rapid fire</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="stats" id="stats"></div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const flash = document.getElementById('flash-overlay');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const params = {
+  branchDepth: 6,
+  branchSpread: 0.5,
+  boltThick: 2.5,
+  glowIntensity: 0.7,
+  rainIntensity: 0.6,
+  wind: 0.3,
+  cloudDark: 0.6,
+  hue: 230,
+  sat: 0.6,
+  thunder: true,
+  screenFlash: true,
+  autoStrikes: true,
+};
+
+const presets = {
+  summer:    { branchDepth:6, branchSpread:0.5, boltThick:2.5, glowIntensity:0.7, rainIntensity:0.6, wind:0.3, cloudDark:0.6, hue:230, sat:0.6 },
+  supercell: { branchDepth:9, branchSpread:0.7, boltThick:4.0, glowIntensity:1.0, rainIntensity:1.0, wind:0.8, cloudDark:0.9, hue:250, sat:0.4 },
+  arctic:    { branchDepth:5, branchSpread:0.3, boltThick:1.8, glowIntensity:0.5, rainIntensity:0.2, wind:0.6, cloudDark:0.4, hue:200, sat:0.3 },
+  volcanic:  { branchDepth:8, branchSpread:0.6, boltThick:3.5, glowIntensity:0.9, rainIntensity:0.1, wind:0.2, cloudDark:0.8, hue:20,  sat:0.9 },
+  alien:     { branchDepth:7, branchSpread:0.8, boltThick:2.0, glowIntensity:0.8, rainIntensity:0.4, wind:0.4, cloudDark:0.5, hue:130, sat:0.9 },
+  heat:      { branchDepth:4, branchSpread:0.4, boltThick:2.0, glowIntensity:0.5, rainIntensity:0.0, wind:0.1, cloudDark:0.3, hue:270, sat:0.2 },
+};
+
+function applyPreset(name) {
+  const p = presets[name]; if (!p) return;
+  Object.assign(params, p);
+  document.getElementById('branch-depth').value = p.branchDepth;
+  document.getElementById('branch-spread').value = p.branchSpread * 100;
+  document.getElementById('bolt-thick').value = p.boltThick * 10;
+  document.getElementById('glow-intensity').value = p.glowIntensity * 100;
+  document.getElementById('rain-intensity').value = p.rainIntensity * 100;
+  document.getElementById('wind').value = p.wind * 100;
+  document.getElementById('cloud-dark').value = p.cloudDark * 100;
+  document.getElementById('bolt-hue').value = p.hue;
+  document.getElementById('bolt-sat').value = p.sat * 100;
+  updateLabels();
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+}
+
+function updateLabels() {
+  document.getElementById('v-depth').textContent = params.branchDepth;
+  document.getElementById('v-spread').textContent = params.branchSpread.toFixed(1);
+  document.getElementById('v-thick').textContent = params.boltThick.toFixed(1);
+  document.getElementById('v-glow').textContent = params.glowIntensity.toFixed(1);
+  document.getElementById('v-rain').textContent = params.rainIntensity.toFixed(1);
+  document.getElementById('v-wind').textContent = params.wind.toFixed(1);
+  document.getElementById('v-cloud').textContent = params.cloudDark.toFixed(1);
+  document.getElementById('v-hue').textContent = params.hue;
+  document.getElementById('v-sat').textContent = params.sat.toFixed(1);
+}
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+});
+
+function bindSlider(id, key, scale = 1) {
+  document.getElementById(id).addEventListener('input', e => {
+    params[key] = +e.target.value / scale;
+    updateLabels();
+  });
+}
+bindSlider('branch-depth', 'branchDepth', 1);
+bindSlider('branch-spread', 'branchSpread', 100);
+bindSlider('bolt-thick', 'boltThick', 10);
+bindSlider('glow-intensity', 'glowIntensity', 100);
+bindSlider('rain-intensity', 'rainIntensity', 100);
+bindSlider('wind', 'wind', 100);
+bindSlider('cloud-dark', 'cloudDark', 100);
+bindSlider('bolt-hue', 'hue', 1);
+bindSlider('bolt-sat', 'sat', 100);
+
+function bindToggle(id, key) {
+  const el = document.getElementById(id);
+  el.addEventListener('click', () => {
+    params[key] = !params[key];
+    el.classList.toggle('on', params[key]);
+  });
+}
+bindToggle('toggle-thunder', 'thunder');
+bindToggle('toggle-flash', 'screenFlash');
+bindToggle('toggle-auto', 'autoStrikes');
+
+// Audio
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playThunder(dist) {
+  if (!params.thunder) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const dur = 1.5 + Math.random() * 2;
+  const delay = dist * 0.003;
+
+  setTimeout(() => {
+    const bufSize = audioCtx.sampleRate * dur;
+    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) {
+      const t = i / bufSize;
+      const rumble = Math.sin(t * 40 + Math.random() * 2) * 0.3;
+      const crack = (Math.random() * 2 - 1) * Math.exp(-t * 8) * 0.5;
+      const roll = (Math.random() * 2 - 1) * Math.exp(-t * 2) * 0.4;
+      const envelope = Math.exp(-t * 1.5) * (1 + Math.sin(t * 12) * 0.3);
+      data[i] = (rumble + crack + roll) * envelope;
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 400 + Math.random() * 300;
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.3 * (1 - dist * 0.001);
+    src.connect(lp).connect(gain).connect(audioCtx.destination);
+    src.start();
+  }, delay * 1000);
+}
+
+// Rain particles
+const raindrops = [];
+const MAX_RAIN = 2000;
+
+function initRain() {
+  for (let i = 0; i < MAX_RAIN; i++) {
+    raindrops.push({
+      x: Math.random() * W * 1.5 - W * 0.25,
+      y: Math.random() * H,
+      speed: 8 + Math.random() * 12,
+      length: 10 + Math.random() * 20,
+      opacity: 0.1 + Math.random() * 0.3,
+    });
+  }
+}
+initRain();
+
+function updateRain() {
+  const windOff = params.wind * 8;
+  const active = Math.floor(MAX_RAIN * params.rainIntensity);
+  for (let i = 0; i < active; i++) {
+    const r = raindrops[i];
+    r.y += r.speed;
+    r.x += windOff;
+    if (r.y > H + 20) {
+      r.y = -r.length;
+      r.x = Math.random() * W * 1.5 - W * 0.25;
+    }
+    if (r.x > W + 50) r.x = -50;
+  }
+}
+
+function drawRain() {
+  const active = Math.floor(MAX_RAIN * params.rainIntensity);
+  if (active === 0) return;
+  ctx.save();
+  const windAngle = Math.atan2(1, params.wind * 0.5);
+  for (let i = 0; i < active; i++) {
+    const r = raindrops[i];
+    ctx.strokeStyle = `rgba(180,200,255,${r.opacity * params.rainIntensity})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(r.x, r.y);
+    ctx.lineTo(r.x + Math.cos(windAngle) * r.length * 0.2, r.y + r.length);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Cloud system
+const clouds = [];
+function initClouds() {
+  for (let i = 0; i < 20; i++) {
+    clouds.push({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.35,
+      w: 200 + Math.random() * 400,
+      h: 40 + Math.random() * 80,
+      speed: 0.1 + Math.random() * 0.3,
+    });
+  }
+}
+initClouds();
+
+function drawClouds() {
+  const dark = params.cloudDark;
+  for (const c of clouds) {
+    c.x += c.speed * (1 + params.wind);
+    if (c.x > W + c.w) c.x = -c.w;
+
+    const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.w * 0.5);
+    grad.addColorStop(0, `rgba(20,20,40,${dark * 0.8})`);
+    grad.addColorStop(0.5, `rgba(15,15,30,${dark * 0.5})`);
+    grad.addColorStop(1, 'rgba(10,10,20,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, c.w * 0.5, c.h, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Lightning bolt generation
+class LightningBolt {
+  constructor(x1, y1, x2, y2) {
+    this.segments = [];
+    this.alpha = 1;
+    this.age = 0;
+    this.lifetime = 0.15 + Math.random() * 0.2;
+    this.generate(x1, y1, x2, y2, params.branchDepth, params.boltThick);
+  }
+
+  generate(x1, y1, x2, y2, depth, width) {
+    const segments = this._fractal(x1, y1, x2, y2, depth);
+    this.segments.push({ points: segments, width, main: true });
+    for (let i = 0; i < segments.length - 1; i++) {
+      if (Math.random() < params.branchSpread * 0.4 && depth > 2) {
+        const p = segments[i];
+        const angle = Math.atan2(y2 - y1, x2 - x1) + (Math.random() - 0.5) * Math.PI * 0.8;
+        const len = (Math.hypot(x2 - x1, y2 - y1) / segments.length) * (2 + Math.random() * 3);
+        const bx = p.x + Math.cos(angle) * len;
+        const by = p.y + Math.sin(angle) * len;
+        const branchSegs = this._fractal(p.x, p.y, bx, by, Math.max(2, depth - 2));
+        this.segments.push({ points: branchSegs, width: width * 0.4, main: false });
+
+        if (Math.random() < params.branchSpread * 0.2 && depth > 3) {
+          const sp = branchSegs[Math.floor(branchSegs.length / 2)];
+          const a2 = angle + (Math.random() - 0.5) * Math.PI * 0.6;
+          const l2 = len * 0.4;
+          const subSegs = this._fractal(sp.x, sp.y, sp.x + Math.cos(a2) * l2, sp.y + Math.sin(a2) * l2, 2);
+          this.segments.push({ points: subSegs, width: width * 0.2, main: false });
+        }
+      }
+    }
+  }
+
+  _fractal(x1, y1, x2, y2, depth) {
+    if (depth <= 0) return [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    const offset = (Math.random() - 0.5) * dist * 0.35 * params.branchSpread;
+    const perp = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
+    const nx = mx + Math.cos(perp) * offset;
+    const ny = my + Math.sin(perp) * offset;
+    const left = this._fractal(x1, y1, nx, ny, depth - 1);
+    const right = this._fractal(nx, ny, x2, y2, depth - 1);
+    return left.concat(right.slice(1));
+  }
+
+  update(dt) {
+    this.age += dt;
+    const t = this.age / this.lifetime;
+    this.alpha = t < 0.1 ? t / 0.1 : Math.max(0, 1 - (t - 0.1) / 0.9);
+    return this.age < this.lifetime;
+  }
+
+  draw() {
+    if (this.alpha <= 0) return;
+    const h = params.hue;
+    const s = params.sat * 100;
+    const glow = params.glowIntensity;
+
+    for (const seg of this.segments) {
+      const pts = seg.points;
+      if (pts.length < 2) continue;
+
+      // Outer glow
+      ctx.save();
+      ctx.globalAlpha = this.alpha * 0.3 * glow;
+      ctx.strokeStyle = `hsl(${h}, ${s}%, 70%)`;
+      ctx.lineWidth = seg.width * 6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = `hsl(${h}, ${s}%, 60%)`;
+      ctx.shadowBlur = 40 * glow;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      ctx.restore();
+
+      // Mid glow
+      ctx.save();
+      ctx.globalAlpha = this.alpha * 0.6 * glow;
+      ctx.strokeStyle = `hsl(${h}, ${Math.max(0, s - 20)}%, 85%)`;
+      ctx.lineWidth = seg.width * 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = `hsl(${h}, ${s}%, 80%)`;
+      ctx.shadowBlur = 20 * glow;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      ctx.restore();
+
+      // Core
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.strokeStyle = `hsl(${h}, ${Math.max(0, s - 40)}%, 97%)`;
+      ctx.lineWidth = seg.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+const bolts = [];
+let totalStrikes = 0;
+
+function spawnBolt(x, y) {
+  const startX = x + (Math.random() - 0.5) * 100;
+  const startY = Math.random() * H * 0.1;
+  bolts.push(new LightningBolt(startX, startY, x, y));
+  totalStrikes++;
+
+  if (params.screenFlash) {
+    flash.style.opacity = 0.15 + params.glowIntensity * 0.2;
+    setTimeout(() => flash.style.opacity = 0, 60);
+    setTimeout(() => {
+      flash.style.opacity = (0.15 + params.glowIntensity * 0.2) * 0.4;
+      setTimeout(() => flash.style.opacity = 0, 40);
+    }, 100);
+  }
+
+  playThunder(Math.hypot(x - W / 2, y - H / 2));
+}
+
+// Cloud-to-cloud lightning
+function spawnCloudBolt() {
+  const x1 = Math.random() * W;
+  const y1 = Math.random() * H * 0.2 + H * 0.05;
+  const x2 = x1 + (Math.random() - 0.5) * W * 0.6;
+  const y2 = Math.random() * H * 0.2 + H * 0.05;
+  bolts.push(new LightningBolt(x1, y1, x2, y2));
+  totalStrikes++;
+
+  if (params.screenFlash) {
+    flash.style.opacity = 0.06;
+    setTimeout(() => flash.style.opacity = 0, 80);
+  }
+
+  playThunder(W * 0.4);
+}
+
+// Input
+let mouseDown = false;
+let holdTimer = null;
+
+canvas.addEventListener('mousedown', e => {
+  mouseDown = true;
+  spawnBolt(e.clientX, e.clientY);
+  holdTimer = setInterval(() => {
+    if (mouseDown) spawnBolt(e.clientX + (Math.random() - 0.5) * 60, e.clientY + (Math.random() - 0.5) * 60);
+  }, 120);
+});
+
+canvas.addEventListener('mouseup', () => {
+  mouseDown = false;
+  clearInterval(holdTimer);
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouseDown = false;
+  clearInterval(holdTimer);
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  spawnBolt(t.clientX, t.clientY);
+});
+
+// Auto strikes
+let autoTimer = 0;
+function autoStrike(dt) {
+  if (!params.autoStrikes) return;
+  autoTimer += dt;
+  const interval = 2 + Math.random() * 4;
+  if (autoTimer > interval) {
+    autoTimer = 0;
+    if (Math.random() < 0.7) {
+      spawnBolt(Math.random() * W, H * 0.3 + Math.random() * H * 0.5);
+    } else {
+      spawnCloudBolt();
+    }
+  }
+}
+
+// Horizon glow
+function drawHorizon() {
+  const grad = ctx.createLinearGradient(0, H * 0.7, 0, H);
+  grad.addColorStop(0, 'rgba(10,10,20,0)');
+  grad.addColorStop(0.5, `rgba(${15 + params.hue * 0.05}, 10, 25, 0.3)`);
+  grad.addColorStop(1, `rgba(${10 + params.hue * 0.03}, 8, 18, 0.6)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H * 0.7, W, H * 0.3);
+}
+
+// Ground silhouette
+function drawGround() {
+  ctx.fillStyle = 'rgba(5,5,10,0.9)';
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  const segments = 40;
+  for (let i = 0; i <= segments; i++) {
+    const x = (i / segments) * W;
+    const baseY = H * 0.88;
+    const hill = Math.sin(i * 0.3) * H * 0.03 + Math.sin(i * 0.7) * H * 0.015;
+    ctx.lineTo(x, baseY + hill);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Main loop
+let lastTime = 0;
+function animate(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.1);
+  lastTime = time;
+
+  // Sky gradient
+  const skyDark = params.cloudDark;
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, `rgb(${Math.floor(8 * (1 - skyDark * 0.5))}, ${Math.floor(8 * (1 - skyDark * 0.5))}, ${Math.floor(18 * (1 - skyDark * 0.3))})`);
+  grad.addColorStop(0.4, `rgb(${Math.floor(12 * (1 - skyDark * 0.4))}, ${Math.floor(10 * (1 - skyDark * 0.4))}, ${Math.floor(22 * (1 - skyDark * 0.3))})`);
+  grad.addColorStop(1, `rgb(${Math.floor(6 * (1 - skyDark * 0.5))}, ${Math.floor(6 * (1 - skyDark * 0.5))}, ${Math.floor(14 * (1 - skyDark * 0.3))})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  drawClouds();
+  drawHorizon();
+  drawGround();
+  drawRain();
+  updateRain();
+
+  // Update and draw bolts
+  for (let i = bolts.length - 1; i >= 0; i--) {
+    if (!bolts[i].update(dt)) {
+      bolts.splice(i, 1);
+    } else {
+      bolts[i].draw();
+    }
+  }
+
+  autoStrike(dt);
+
+  // Ambient flicker from active bolts
+  if (bolts.length > 0) {
+    const maxAlpha = bolts.reduce((m, b) => Math.max(m, b.alpha), 0);
+    const ambGrad = ctx.createRadialGradient(W / 2, H * 0.3, 0, W / 2, H * 0.3, W);
+    ambGrad.addColorStop(0, `hsla(${params.hue}, ${params.sat * 100}%, 50%, ${maxAlpha * 0.03})`);
+    ambGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = ambGrad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  document.getElementById('stats').textContent = `Strikes: ${totalStrikes} | Active: ${bolts.length}`;
+
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

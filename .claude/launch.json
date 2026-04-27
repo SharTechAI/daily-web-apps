@@ -108,6 +108,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "bioluminescent-ocean", "-l", "3473"],
       "port": 3473
+    },
+    {
+      "name": "lightning-storm-generator",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "lightning-storm-generator", "-l", "3474"],
+      "port": 3474
     }
   ]
 }
